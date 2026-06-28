@@ -3,10 +3,13 @@ package claude
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +22,34 @@ const (
 )
 
 var ErrInvalidKey = errors.New("invalid Claude API key format")
+
+// ReadStoredCredentials reads Claude API key from ~/.claude/.credentials.json
+func ReadStoredCredentials() (string, error) {
+	credFile := filepath.Join(os.ExpandEnv("$HOME"), ".claude", ".credentials.json")
+
+	data, err := os.ReadFile(credFile)
+	if err != nil {
+		return "", fmt.Errorf("could not read Claude credentials: %w", err)
+	}
+
+	var creds map[string]interface{}
+	if err := json.Unmarshal(data, &creds); err != nil {
+		return "", fmt.Errorf("could not parse Claude credentials: %w", err)
+	}
+
+	// Navigate to claudeAiOauth.accessToken
+	claudeAiOauth, ok := creds["claudeAiOauth"].(map[string]interface{})
+	if !ok {
+		return "", errors.New("claudeAiOauth not found in credentials")
+	}
+
+	accessToken, ok := claudeAiOauth["accessToken"].(string)
+	if !ok || accessToken == "" {
+		return "", errors.New("accessToken not found or empty in credentials")
+	}
+
+	return accessToken, nil
+}
 
 // PromptForAPIKey prompts the user for a Claude API key with masked input.
 func PromptForAPIKey(stdin io.Reader) (string, error) {

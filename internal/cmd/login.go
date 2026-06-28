@@ -293,10 +293,13 @@ func loginClaude(c *client.Client, wsID string, force bool) error {
 		}
 	}
 
-	fmt.Println("Prompting for Claude API key...")
-	key, err := claude.PromptForAPIKey(os.Stdin)
+	fmt.Println("Looking for Claude credentials...")
+	key, err := claude.ReadStoredCredentials()
 	if err != nil {
-		return fmt.Errorf("failed to read API key: %w", err)
+		return fmt.Errorf("could not find Claude credentials: %w", err)
+	}
+	if key == "" {
+		return fmt.Errorf("no Claude API key found in ~/.claude/.credentials.json")
 	}
 
 	fmt.Println("Validating Claude API key...")
@@ -310,7 +313,7 @@ func loginClaude(c *client.Client, wsID string, force bool) error {
 	}
 
 	fmt.Println()
-	fmt.Println("You're now authenticated with Claude!")
+	fmt.Println("✅ Successfully linked your Claude authentication to c0d3r!")
 	return nil
 }
 
@@ -328,24 +331,26 @@ func loginCodex(c *client.Client, wsID string, force bool) error {
 		}
 	}
 
-	fmt.Println("Prompting for Codex/OpenAI API key...")
-	key, err := codex.PromptForAPIKey(os.Stdin)
+	fmt.Println("Looking for Codex/OpenAI credentials...")
+	token, err := codex.ReadStoredCredentials()
 	if err != nil {
-		return fmt.Errorf("failed to read API key: %w", err)
+		return fmt.Errorf("could not find Codex credentials: %w", err)
+	}
+	if token == nil || token.AccessToken == "" {
+		return fmt.Errorf("no OpenAI access token found in ~/.codex/auth.json")
 	}
 
-	fmt.Println("Validating Codex/OpenAI API key...")
-	if err := codex.ValidateAPIKey(ctx, key); err != nil {
-		return fmt.Errorf("invalid API key: %w", err)
+	fmt.Println("Validating Codex/OpenAI access token...")
+	if err := codex.ValidateToken(ctx, token.AccessToken); err != nil {
+		return fmt.Errorf("invalid access token: %w", err)
 	}
 
-	token := codex.TokenFromAPIKey(key)
 	if err := c.SetConfigField(ctx, wsID, config.ScopeGlobal, "providers.codex.oauth", token); err != nil {
 		return err
 	}
 
 	fmt.Println()
-	fmt.Println("You're now authenticated with Codex!")
+	fmt.Println("✅ Successfully linked your Codex/OpenAI authentication to c0d3r!")
 	return nil
 }
 
