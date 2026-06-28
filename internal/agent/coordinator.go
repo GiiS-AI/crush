@@ -18,24 +18,25 @@ import (
 
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
-	"github.com/charmbracelet/crush/internal/agent/hyper"
-	"github.com/charmbracelet/crush/internal/agent/notify"
-	"github.com/charmbracelet/crush/internal/agent/prompt"
-	"github.com/charmbracelet/crush/internal/agent/tools"
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/discover"
-	"github.com/charmbracelet/crush/internal/event"
-	"github.com/charmbracelet/crush/internal/filetracker"
-	"github.com/charmbracelet/crush/internal/history"
-	"github.com/charmbracelet/crush/internal/hooks"
-	"github.com/charmbracelet/crush/internal/log"
-	"github.com/charmbracelet/crush/internal/lsp"
-	"github.com/charmbracelet/crush/internal/message"
-	"github.com/charmbracelet/crush/internal/oauth/copilot"
-	"github.com/charmbracelet/crush/internal/permission"
-	"github.com/charmbracelet/crush/internal/pubsub"
-	"github.com/charmbracelet/crush/internal/session"
-	"github.com/charmbracelet/crush/internal/skills"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/hyper"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/notify"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/prompt"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/tools"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/discover"
+	"github.com/GiiS-AI/GiiS-Code/internal/event"
+	"github.com/GiiS-AI/GiiS-Code/internal/filetracker"
+	"github.com/GiiS-AI/GiiS-Code/internal/history"
+	"github.com/GiiS-AI/GiiS-Code/internal/hooks"
+	"github.com/GiiS-AI/GiiS-Code/internal/log"
+	"github.com/GiiS-AI/GiiS-Code/internal/lsp"
+	"github.com/GiiS-AI/GiiS-Code/internal/message"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth/copilot"
+	"github.com/GiiS-AI/GiiS-Code/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/session"
+	"github.com/GiiS-AI/GiiS-Code/internal/skills"
+	giisskill "github.com/GiiS-AI/GiiS-Code/internal/skills/giis"
 	"golang.org/x/sync/errgroup"
 
 	"charm.land/fantasy/providers/anthropic"
@@ -246,7 +247,7 @@ func (c *coordinator) run(ctx context.Context, accept *AcceptedRun, sessionID st
 	// Coalesce per-attempt RunComplete payloads so only the final
 	// outcome reaches subscribers. Without this, the first attempt's
 	// failed RunComplete (unauthorized) would race ahead of the
-	// retry's success, and `crush run` would exit on the stale error
+	// retry's success, and `giis-code run` would exit on the stale error
 	// before ever seeing the retry result. Each attempt's
 	// SessionAgentCall.OnComplete hook overwrites latest; we publish
 	// exactly once after retries resolve, via PublishMustDeliver, so
@@ -615,7 +616,7 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 		}
 	}
 
-	logFile := filepath.Join(c.cfg.Config().Options.DataDirectory, "logs", "crush.log")
+	logFile := filepath.Join(c.cfg.Config().Options.DataDirectory, "logs", "giis-code.log")
 
 	// Build hook runner if PreToolUse hooks are configured.
 	var hookRunner *hooks.Runner
@@ -642,6 +643,10 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 		tools.NewViewTool(c.lspManager, c.permissions, c.filetracker, c.skillTracker, c.cfg.WorkingDir(), c.cfg.Config().Options.SkillsPaths...),
 		tools.NewWriteTool(c.lspManager, c.permissions, c.history, c.filetracker, c.cfg.WorkingDir()),
 	)
+
+	if giisTools := giisskill.Tools(); len(giisTools) > 0 {
+		allTools = append(allTools, giisTools...)
+	}
 
 	// Add LSP tools if user has configured LSPs or auto_lsp is enabled (nil or true).
 	if len(c.cfg.Config().LSP) > 0 || c.cfg.Config().Options.AutoLSP == nil || *c.cfg.Config().Options.AutoLSP {
@@ -1041,7 +1046,7 @@ func (c *coordinator) buildProvider(providerCfg config.ProviderConfig, model con
 		switch providerCfg.ID {
 		case hyper.Name:
 			baseURL = hyper.BaseURL() + "/v1"
-			headers["x-crush-id"] = event.GetID()
+			headers["x-giis-code-id"] = event.GetID()
 		case string(catwalk.InferenceProviderZAI):
 			if providerCfg.ExtraBody == nil {
 				providerCfg.ExtraBody = map[string]any{}

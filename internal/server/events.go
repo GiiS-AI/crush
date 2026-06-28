@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/charmbracelet/crush/internal/agent/notify"
-	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
-	"github.com/charmbracelet/crush/internal/app"
-	"github.com/charmbracelet/crush/internal/backend"
-	"github.com/charmbracelet/crush/internal/history"
-	"github.com/charmbracelet/crush/internal/message"
-	"github.com/charmbracelet/crush/internal/permission"
-	"github.com/charmbracelet/crush/internal/proto"
-	"github.com/charmbracelet/crush/internal/pubsub"
-	"github.com/charmbracelet/crush/internal/session"
-	"github.com/charmbracelet/crush/internal/skills"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/notify"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/tools/mcp"
+	"github.com/GiiS-AI/GiiS-Code/internal/app"
+	"github.com/GiiS-AI/GiiS-Code/internal/backend"
+	"github.com/GiiS-AI/GiiS-Code/internal/history"
+	"github.com/GiiS-AI/GiiS-Code/internal/message"
+	"github.com/GiiS-AI/GiiS-Code/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/proto"
+	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/session"
+	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 )
 
 // wrapEvent converts a raw tea.Msg (a pubsub.Event[T] from the app

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/charmbracelet/crush/internal/lock"
+	"github.com/GiiS-AI/GiiS-Code/internal/lock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +56,7 @@ func TestRelease_NoopForUnknownDataDir(t *testing.T) {
 	require.NoError(t, Release("/nonexistent/path"), "releasing unknown data dir should not error")
 }
 
-// TestConnect_FailsWhenDataDirLocked simulates a second crush process by
+// TestConnect_FailsWhenDataDirLocked simulates a second giis-code process by
 // taking the data-dir lock directly via the OS primitive on a separate
 // file descriptor and then asserting that Connect surfaces a clean
 // ErrDataDirLocked instead of opening the database under contention.

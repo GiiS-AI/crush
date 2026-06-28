@@ -12,16 +12,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/proto"
-	"github.com/charmbracelet/crush/internal/server"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/proto"
+	"github.com/GiiS-AI/GiiS-Code/internal/server"
 	"github.com/google/uuid"
 )
 
 // DummyHost is used to satisfy the http.Client's requirement for a URL.
-const DummyHost = "api.crush.localhost"
+const DummyHost = "api.giis-code.localhost"
 
-// Client represents an RPC client connected to a Crush server.
+// Client represents an RPC client connected to a GiiS-Code server.
 type Client struct {
 	h        *http.Client
 	path     string

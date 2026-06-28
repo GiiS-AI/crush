@@ -1,5 +1,5 @@
 // Package mcp provides functionality for managing Model Context Protocol (MCP)
-// clients within the Crush application.
+// clients within the GiiS-Code application.
 package mcp
 
 import (
@@ -16,12 +16,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/csync"
-	"github.com/charmbracelet/crush/internal/home"
-	"github.com/charmbracelet/crush/internal/permission"
-	"github.com/charmbracelet/crush/internal/pubsub"
-	"github.com/charmbracelet/crush/internal/version"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/csync"
+	"github.com/GiiS-AI/GiiS-Code/internal/home"
+	"github.com/GiiS-AI/GiiS-Code/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -364,9 +364,9 @@ func createSession(ctx context.Context, name string, m config.MCPConfig, resolve
 
 	client := mcp.NewClient(
 		&mcp.Implementation{
-			Name:    "crush",
+			Name:    "giis-code",
 			Version: version.Version,
-			Title:   "Crush",
+			Title:   "GiiS-Code",
 		},
 		&mcp.ClientOptions{
 			ToolListChangedHandler: func(context.Context, *mcp.ToolListChangedRequest) {

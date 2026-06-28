@@ -9,11 +9,11 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/crush/internal/commands"
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/ui/common"
-	"github.com/charmbracelet/crush/internal/ui/list"
-	"github.com/charmbracelet/crush/internal/ui/styles"
+	"github.com/GiiS-AI/GiiS-Code/internal/commands"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/ui/common"
+	"github.com/GiiS-AI/GiiS-Code/internal/ui/list"
+	"github.com/GiiS-AI/GiiS-Code/internal/ui/styles"
 	uv "github.com/charmbracelet/ultraviolet"
 )
 

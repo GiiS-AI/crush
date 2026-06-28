@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/crush/internal/agent/notify"
-	"github.com/charmbracelet/crush/internal/permission"
-	"github.com/charmbracelet/crush/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/notify"
+	"github.com/GiiS-AI/GiiS-Code/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
 )
 
 // NewForTest constructs a minimal [App] suitable for in-process tests

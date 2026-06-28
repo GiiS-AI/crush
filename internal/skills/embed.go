@@ -5,11 +5,12 @@ import (
 	"io/fs"
 	"log/slog"
 	"path/filepath"
+	"slices"
 )
 
 // BuiltinPrefix is the path prefix for builtin skill files. It is used by
 // the View tool to distinguish embedded files from disk files.
-const BuiltinPrefix = "crush://skills/"
+const BuiltinPrefix = "giis-code://skills/"
 
 //go:embed builtin/*
 var builtinFS embed.FS
@@ -54,9 +55,9 @@ func DiscoverBuiltinWithStates() ([]*Skill, []*SkillState) {
 			return nil
 		}
 
-		// Set paths using the crush prefix. Strip the leading "builtin/"
+		// Set paths using the giis-code prefix. Strip the leading "builtin/"
 		// so the path is relative to the embedded root
-		// (e.g., "crush://skills/crush-config/SKILL.md").
+		// (e.g., "giis-code://skills/giis-code-config/SKILL.md").
 		relPath, _ := filepath.Rel("builtin", path)
 		relPath = filepath.ToSlash(relPath)
 		skill.SkillFilePath = BuiltinPrefix + relPath
@@ -74,6 +75,18 @@ func DiscoverBuiltinWithStates() ([]*Skill, []*SkillState) {
 		states = append(states, &SkillState{Name: skill.Name, Path: skill.SkillFilePath, State: StateNormal})
 		return nil
 	})
+
+	builtinProvidersMu.RLock()
+	providers := slices.Clone(builtinProviders)
+	builtinProvidersMu.RUnlock()
+	for _, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		extraSkills, extraStates := provider()
+		discovered = append(discovered, extraSkills...)
+		states = append(states, extraStates...)
+	}
 
 	return discovered, states
 }

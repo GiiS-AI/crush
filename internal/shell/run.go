@@ -28,7 +28,7 @@ type RunOptions struct {
 	Command string
 	// Cwd is the working directory for the execution. Required: callers
 	// must supply a non-empty value. Run does not silently fall back to
-	// the Crush process cwd — hooks and the bash tool have different
+	// the GiiS-Code process cwd — hooks and the bash tool have different
 	// notions of "default" and each owns that decision.
 	Cwd string
 	// Env is the full environment visible to the command. The caller is
@@ -181,7 +181,7 @@ func RunAndCapturePTY(ctx context.Context, opts RunOptions) (CaptureResult, erro
 }
 
 // newRunner constructs an [interp.Runner] configured with the standard
-// Crush handler stack. Shared by the stateless [Run] entrypoint and the
+// GiiS-Code handler stack. Shared by the stateless [Run] entrypoint and the
 // stateful [Shell] so the two surfaces cannot drift.
 func newRunner(cwd string, env []string, stdin io.Reader, stdout, stderr io.Writer, blockFuncs []BlockFunc) (*interp.Runner, error) {
 	env = withNonInteractiveEnv(env)
@@ -195,14 +195,14 @@ func newRunner(cwd string, env []string, stdin io.Reader, stdout, stderr io.Writ
 }
 
 // execHandlerOption returns an interp.RunnerOption that installs the
-// standard Crush middleware chain (builtins, script dispatch, block list)
+// standard GiiS-Code middleware chain (builtins, script dispatch, block list)
 // on top of a process-group-isolated base exec handler.
 //
 // We use interp.ExecHandler (singular) with a manually-built chain rather
 // than interp.ExecHandlers because the latter always appends
 // interp.DefaultExecHandler as the final handler, which lacks process group
 // isolation. Without isolation, shells like zsh that set up job control
-// when sourcing framework files can send SIGINT/SIGTERM to Crush's process
+// when sourcing framework files can send SIGINT/SIGTERM to GiiS-Code's process
 // group and crash the parent.
 func execHandlerOption(blockFuncs []BlockFunc) interp.RunnerOption {
 	base := processGroupExecHandler(defaultKillTimeout)
@@ -215,7 +215,7 @@ func execHandlerOption(blockFuncs []BlockFunc) interp.RunnerOption {
 
 // nonInteractiveEnvVars are forced on every shell execution to prevent
 // commands from hanging on a nonexistent TTY. These are always applied
-// regardless of the caller's environment because Crush shells are never
+// regardless of the caller's environment because GiiS-Code shells are never
 // interactive — preserving user preferences like EDITOR=nvim only causes
 // hangs, not useful behavior.
 var nonInteractiveEnvVars = []string{
@@ -255,7 +255,7 @@ func withNonInteractiveEnv(env []string) []string {
 
 // standardHandlers returns the exec-handler middleware chain used by both
 // [Run] and [Shell]. Order matters:
-//  1. builtins first (so Crush's in-process jq wins over any PATH binary);
+//  1. builtins first (so GiiS-Code's in-process jq wins over any PATH binary);
 //  2. script dispatch (shebang / binary / shell-source for path-prefixed
 //     argv[0], no-op for bare commands) — runs before the block list so
 //     that deny rules see the already-resolved argv of anything the
@@ -274,7 +274,7 @@ func standardHandlers(blockFuncs []BlockFunc) []func(next interp.ExecHandlerFunc
 	return handlers
 }
 
-// builtinHandler returns middleware that dispatches recognized Crush
+// builtinHandler returns middleware that dispatches recognized GiiS-Code
 // builtins to their in-process Go implementations. Currently: jq.
 func builtinHandler() func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 	return func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {

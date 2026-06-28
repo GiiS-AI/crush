@@ -31,6 +31,80 @@ func renderWord(spacing int, stretchIndex int, letterforms ...letterform) string
 	)
 }
 
+// LetterG renders the letter G in a stylized way. It takes an integer that
+// determines how many cells to stretch the letter. If the stretch is less than
+// 1, it defaults to no stretching.
+func LetterG(stretch bool) string {
+	// Here's what we're making:
+	//
+	// ▄▀▀▀
+	// █   ▀
+	// ▀▀▀▀
+
+	left := heredoc.Doc(`
+		▄
+		█
+		▀
+	`)
+	center := heredoc.Doc(`
+		▀
+
+		▀
+	`)
+	notch := heredoc.Doc(`
+
+		▀
+
+	`)
+	return joinLetterform(
+		left,
+		stretchLetterformPart(center, letterformProps{
+			stretch:    stretch,
+			width:      3,
+			minStretch: 6,
+			maxStretch: 10,
+		}),
+		notch,
+	)
+}
+
+// LetterI renders the letter I in a stylized way with serifs. It takes an
+// integer that determines how many cells to stretch the letter. If the stretch
+// is less than 1, it defaults to no stretching.
+func LetterI(stretch bool) string {
+	// Here's what we're making:
+	//
+	// ▀▀▀▀▀
+	//   █
+	// ▀▀▀▀▀
+
+	serif := heredoc.Doc(`
+		▀
+
+		▀
+	`)
+	stem := heredoc.Doc(`
+		▀
+		█
+		▀
+	`)
+	return joinLetterform(
+		stretchLetterformPart(serif, letterformProps{
+			stretch:    stretch,
+			width:      2,
+			minStretch: 3,
+			maxStretch: 6,
+		}),
+		stem,
+		stretchLetterformPart(serif, letterformProps{
+			stretch:    stretch,
+			width:      2,
+			minStretch: 3,
+			maxStretch: 6,
+		}),
+	)
+}
+
 // LetterC renders the letter C in a stylized way. It takes an integer that
 // determines how many cells to stretch the letter. If the stretch is less than
 // 1, it defaults to no stretching.

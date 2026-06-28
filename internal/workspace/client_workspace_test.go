@@ -8,12 +8,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/charmbracelet/crush/internal/client"
-	"github.com/charmbracelet/crush/internal/message"
-	"github.com/charmbracelet/crush/internal/permission"
-	"github.com/charmbracelet/crush/internal/proto"
-	"github.com/charmbracelet/crush/internal/pubsub"
-	"github.com/charmbracelet/crush/internal/skills"
+	"github.com/GiiS-AI/GiiS-Code/internal/client"
+	"github.com/GiiS-AI/GiiS-Code/internal/message"
+	"github.com/GiiS-AI/GiiS-Code/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/proto"
+	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 	"github.com/stretchr/testify/require"
 )
 

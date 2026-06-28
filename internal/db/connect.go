@@ -45,7 +45,7 @@ func init() {
 // lock is acquired exactly once when the entry is created and released
 // when the last reference is dropped, which lets the same process open
 // the same data directory concurrently while still blocking a second
-// crush process from racing the storage.
+// giis-code process from racing the storage.
 type connEntry struct {
 	db       *sql.DB
 	refCount int
@@ -90,7 +90,7 @@ func Connect(ctx context.Context, dataDir string, opts ...ConnectOption) (*sql.D
 		opt(&cfg)
 	}
 
-	dbPath := filepath.Join(dataDir, "crush.db")
+	dbPath := filepath.Join(dataDir, "giis-code.db")
 
 	// Resolve to an absolute path so that different relative paths to
 	// the same file share a single connection.
@@ -109,11 +109,11 @@ func Connect(ctx context.Context, dataDir string, opts ...ConnectOption) (*sql.D
 
 	// Take the per-data-directory lock before opening the database so
 	// we fail fast and with a clear error rather than racing another
-	// crush process on the same SQLite file. The lock is released when
+	// giis-code process on the same SQLite file. The lock is released when
 	// the matching Release call drops the refcount to zero. Ensuring
 	// the data directory exists is required because the lock file
 	// lives inside it. Locking is opt-in via WithDataDirLock so that
-	// local-mode invocations do not refuse a second crush against the
+	// local-mode invocations do not refuse a second giis-code against the
 	// same data dir until client/server becomes the default.
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create data directory %q: %w", dataDir, err)
@@ -175,7 +175,7 @@ func Connect(ctx context.Context, dataDir string, opts ...ConnectOption) (*sql.D
 // data directory. When the count reaches zero the underlying connection
 // is closed and removed from the pool.
 func Release(dataDir string) error {
-	dbPath := filepath.Join(dataDir, "crush.db")
+	dbPath := filepath.Join(dataDir, "giis-code.db")
 	absPath, err := filepath.Abs(dbPath)
 	if err != nil {
 		absPath = dbPath

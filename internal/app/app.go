@@ -18,28 +18,28 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/crush/internal/agent"
-	"github.com/charmbracelet/crush/internal/agent/notify"
-	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
-	"github.com/charmbracelet/crush/internal/clipboard"
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/db"
-	"github.com/charmbracelet/crush/internal/event"
-	"github.com/charmbracelet/crush/internal/filetracker"
-	"github.com/charmbracelet/crush/internal/format"
-	"github.com/charmbracelet/crush/internal/history"
-	"github.com/charmbracelet/crush/internal/log"
-	"github.com/charmbracelet/crush/internal/lsp"
-	"github.com/charmbracelet/crush/internal/message"
-	"github.com/charmbracelet/crush/internal/permission"
-	"github.com/charmbracelet/crush/internal/pubsub"
-	"github.com/charmbracelet/crush/internal/session"
-	"github.com/charmbracelet/crush/internal/shell"
-	"github.com/charmbracelet/crush/internal/skills"
-	"github.com/charmbracelet/crush/internal/ui/anim"
-	"github.com/charmbracelet/crush/internal/ui/styles"
-	"github.com/charmbracelet/crush/internal/update"
-	"github.com/charmbracelet/crush/internal/version"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/notify"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/tools/mcp"
+	"github.com/GiiS-AI/GiiS-Code/internal/clipboard"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/db"
+	"github.com/GiiS-AI/GiiS-Code/internal/event"
+	"github.com/GiiS-AI/GiiS-Code/internal/filetracker"
+	"github.com/GiiS-AI/GiiS-Code/internal/format"
+	"github.com/GiiS-AI/GiiS-Code/internal/history"
+	"github.com/GiiS-AI/GiiS-Code/internal/log"
+	"github.com/GiiS-AI/GiiS-Code/internal/lsp"
+	"github.com/GiiS-AI/GiiS-Code/internal/message"
+	"github.com/GiiS-AI/GiiS-Code/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/session"
+	"github.com/GiiS-AI/GiiS-Code/internal/shell"
+	"github.com/GiiS-AI/GiiS-Code/internal/skills"
+	"github.com/GiiS-AI/GiiS-Code/internal/ui/anim"
+	"github.com/GiiS-AI/GiiS-Code/internal/ui/styles"
+	"github.com/GiiS-AI/GiiS-Code/internal/update"
+	"github.com/GiiS-AI/GiiS-Code/internal/version"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/charmtone"
 	"github.com/charmbracelet/x/term"
@@ -79,7 +79,7 @@ type App struct {
 	// runCompletions is the authoritative per-run completion signal,
 	// emitted once per top-level agent turn after all message
 	// updates have been flushed. Bridged into app.events so SSE
-	// subscribers (notably `crush run` in client/server mode) can
+	// subscribers (notably `giis-code run` in client/server mode) can
 	// drive their exit on a deterministic, payload-bearing event
 	// instead of guessing from message finish parts.
 	runCompletions *pubsub.Broker[notify.RunComplete]
@@ -553,7 +553,7 @@ func setupSubscriber[T any](
 // app.events broker using PublishMustDeliver instead of Publish. Use
 // this for terminal events that subscribers cannot tolerate losing —
 // notably RunComplete, which is the authoritative end-of-run signal
-// for `crush run`. A lossy fan-in here can drop the only terminal
+// for `giis-code run`. A lossy fan-in here can drop the only terminal
 // event and hang non-interactive clients waiting on it.
 func setupSubscriberMustDeliver[T any](
 	ctx context.Context,

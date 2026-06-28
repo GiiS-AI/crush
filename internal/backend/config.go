@@ -5,14 +5,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/charmbracelet/crush/internal/agent"
-	mcptools "github.com/charmbracelet/crush/internal/agent/tools/mcp"
-	"github.com/charmbracelet/crush/internal/commands"
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/oauth"
-	"github.com/charmbracelet/crush/internal/proto"
-	"github.com/charmbracelet/crush/internal/pubsub"
-	"github.com/charmbracelet/crush/internal/skills"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent"
+	mcptools "github.com/GiiS-AI/GiiS-Code/internal/agent/tools/mcp"
+	"github.com/GiiS-AI/GiiS-Code/internal/commands"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth"
+	"github.com/GiiS-AI/GiiS-Code/internal/proto"
+	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 )
 
 // publishConfigChanged publishes a ConfigChanged event on the workspace's

@@ -7,9 +7,9 @@ import (
 	"log/slog"
 
 	"charm.land/fantasy"
-	"github.com/charmbracelet/crush/internal/agent/tools"
-	"github.com/charmbracelet/crush/internal/hooks"
-	"github.com/charmbracelet/crush/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/tools"
+	"github.com/GiiS-AI/GiiS-Code/internal/hooks"
+	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/tidwall/sjson"
 )
 

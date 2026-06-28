@@ -3,7 +3,7 @@ package session
 import (
 	"testing"
 
-	"github.com/charmbracelet/crush/internal/db"
+	"github.com/GiiS-AI/GiiS-Code/internal/db"
 	"github.com/stretchr/testify/require"
 )
 

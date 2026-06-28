@@ -12,11 +12,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/filepathext"
-	"github.com/charmbracelet/crush/internal/home"
-	"github.com/charmbracelet/crush/internal/shell"
-	"github.com/charmbracelet/crush/internal/skills"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/filepathext"
+	"github.com/GiiS-AI/GiiS-Code/internal/home"
+	"github.com/GiiS-AI/GiiS-Code/internal/shell"
+	"github.com/GiiS-AI/GiiS-Code/internal/skills"
+	_ "github.com/GiiS-AI/GiiS-Code/internal/skills/giis"
 )
 
 // Prompt represents a template-based prompt generator.

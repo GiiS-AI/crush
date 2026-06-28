@@ -10,17 +10,17 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/charmbracelet/crush/internal/lock"
-	"github.com/charmbracelet/crush/internal/version"
+	"github.com/GiiS-AI/GiiS-Code/internal/lock"
+	"github.com/GiiS-AI/GiiS-Code/internal/version"
 )
 
 // ErrDataDirLocked is returned by Connect when the data directory is
-// already in use by another crush process.
-var ErrDataDirLocked = errors.New("data directory already in use by another crush process")
+// already in use by another giis-code process.
+var ErrDataDirLocked = errors.New("data directory already in use by another giis-code process")
 
 // dataDirLockFile is the name of the lock file inside the data
-// directory. It lives next to crush.db so users can `ls` and find it.
-const dataDirLockFile = "crush.lock"
+// directory. It lives next to giis-code.db so users can `ls` and find it.
+const dataDirLockFile = "giis-code.lock"
 
 // dataDirOwnerInfo is the JSON payload written into the lock file by
 // the process that currently owns it. It is purely informational; the
@@ -40,7 +40,7 @@ type dataDirLock struct {
 }
 
 // acquireDataDirLock takes an exclusive non-blocking lock on
-// {dataDir}/crush.lock. If the lock is already held by another
+// {dataDir}/giis-code.lock. If the lock is already held by another
 // process, it returns ErrDataDirLocked wrapped with a diagnostic that
 // includes whatever owner info that process wrote.
 //

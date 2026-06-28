@@ -30,6 +30,7 @@ func TestLogoutCmd_ValidArgs(t *testing.T) {
 	}
 	require.True(t, validPlatforms["hyper"])
 	require.True(t, validPlatforms["copilot"])
+	require.True(t, validPlatforms["giis-cloud"])
 	require.True(t, validPlatforms["github"])
 	require.True(t, validPlatforms["github-copilot"])
 }

@@ -1,4 +1,4 @@
-module github.com/charmbracelet/crush
+module github.com/GiiS-AI/GiiS-Code
 
 go 1.26.4
 

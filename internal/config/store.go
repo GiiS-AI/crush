@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"charm.land/catwalk/pkg/catwalk"
-	hyperp "github.com/charmbracelet/crush/internal/agent/hyper"
-	"github.com/charmbracelet/crush/internal/env"
-	"github.com/charmbracelet/crush/internal/lock"
-	"github.com/charmbracelet/crush/internal/oauth"
-	"github.com/charmbracelet/crush/internal/oauth/copilot"
-	"github.com/charmbracelet/crush/internal/oauth/hyper"
+	hyperp "github.com/GiiS-AI/GiiS-Code/internal/agent/hyper"
+	"github.com/GiiS-AI/GiiS-Code/internal/env"
+	"github.com/GiiS-AI/GiiS-Code/internal/lock"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth/copilot"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth/hyper"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -58,8 +58,8 @@ type ConfigStore struct {
 	config             *Config
 	workingDir         string
 	resolver           VariableResolver
-	globalDataPath     string   // ~/.local/share/crush/crush.json
-	workspacePath      string   // .crush/crush.json
+	globalDataPath     string   // ~/.local/share/giis-code/giis-code.json
+	workspacePath      string   // .giis-code/giis-code.json
 	loadedPaths        []string // config files that were successfully loaded
 	knownProviders     []catwalk.Provider
 	overrides          RuntimeOverrides

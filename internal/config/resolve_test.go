@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/crush/internal/env"
+	"github.com/GiiS-AI/GiiS-Code/internal/env"
 	"github.com/stretchr/testify/require"
 )
 

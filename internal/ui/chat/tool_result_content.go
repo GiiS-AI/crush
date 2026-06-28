@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/charmbracelet/crush/internal/diffdetect"
-	"github.com/charmbracelet/crush/internal/stringext"
-	"github.com/charmbracelet/crush/internal/ui/styles"
+	"github.com/GiiS-AI/GiiS-Code/internal/diffdetect"
+	"github.com/GiiS-AI/GiiS-Code/internal/stringext"
+	"github.com/GiiS-AI/GiiS-Code/internal/ui/styles"
 )
 
 type toolResultContentWidths struct {

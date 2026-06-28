@@ -1,21 +1,21 @@
 ---
-name: crush-config
-description: Use when the user needs help configuring Crush — working with crush.json, setting up providers, configuring LSPs, adding MCP servers, managing skills or permissions, or changing Crush behavior.
+name: giis-code-config
+description: Use when the user needs help configuring GiiS-Code — working with giis-code.json, setting up providers, configuring LSPs, adding MCP servers, managing skills or permissions, or changing GiiS-Code behavior.
 ---
 
-# Crush Configuration
+# GiiS-Code Configuration
 
-Crush uses JSON configuration files with the following priority (highest to lowest):
+GiiS-Code uses JSON configuration files with the following priority (highest to lowest):
 
-1. `.crush.json` (project-local, hidden)
-2. `crush.json` (project-local)
-3. `$XDG_CONFIG_HOME/crush/crush.json` or `$HOME/.config/crush/crush.json` (global)
+1. `.giis-code.json` (project-local, hidden)
+2. `giis-code.json` (project-local)
+3. `$XDG_CONFIG_HOME/giis-code/giis-code.json` or `$HOME/.config/giis-code/giis-code.json` (global)
 
 ## Basic Structure
 
 ```json
 {
-  "$schema": "https://charm.land/crush.json",
+  "$schema": "https://giis.ai/giis-code.json",
   "models": {},
   "providers": {},
   "mcp": {},
@@ -31,7 +31,7 @@ The `$schema` property enables IDE autocomplete but is optional.
 
 ## Shell Expansion
 
-Crush runs selected string fields through an embedded bash-compatible
+GiiS-Code runs selected string fields through an embedded bash-compatible
 shell at load time, so values can pull from env vars, files, or helper
 commands.
 
@@ -76,9 +76,9 @@ var isn't set. Applies to MCP `headers` and provider `extra_headers`.
 
 ### Security note
 
-`crush.json` is trusted code. Any `$(...)` in it runs at load time
+`giis-code.json` is trusted code. Any `$(...)` in it runs at load time
 with the invoking user's shell privileges, before the UI appears.
-Don't launch Crush in a directory whose `crush.json` you haven't
+Don't launch GiiS-Code in a directory whose `giis-code.json` you haven't
 reviewed.
 
 ## Common Tasks
@@ -188,7 +188,7 @@ reviewed.
   "options": {
     "skills_paths": ["./skills"],
     "disabled_tools": ["bash", "sourcegraph"],
-    "disabled_skills": ["crush-config"],
+    "disabled_skills": ["giis-code-config"],
     "tui": {
       "compact_mode": false,
       "diff_mode": "unified",
@@ -207,7 +207,7 @@ reviewed.
 
 > [!IMPORTANT]
 > The following skill paths are loaded by default and DO NOT NEED to be added to `skills_paths`:
-> `.agents/skills`, `.crush/skills`, `.claude/skills`, `.cursor/skills`
+> `.agents/skills`, `.giis-code/skills`, `.claude/skills`, `.cursor/skills`
 
 Other options: `context_paths`, `progress`, `disable_notifications`, `disable_auto_summarize`, `disable_metrics`, `disable_provider_auto_update`, `disable_default_providers`, `data_directory`, `initialize_as`.
 
@@ -252,11 +252,11 @@ Hooks are user-defined shell commands that fire on agent events. Currently only 
     "PreToolUse": [
       {
         "matcher": "^(edit|write|multiedit)$",
-        "command": ".crush/hooks/protect-files.sh"
+        "command": ".giis-code/hooks/protect-files.sh"
       },
       {
         "matcher": "^bash$",
-        "command": ".crush/hooks/no-haskell.sh"
+        "command": ".giis-code/hooks/no-haskell.sh"
       }
     ]
   }
@@ -329,7 +329,7 @@ exit 2
 
 ### Claude Code Compatibility
 
-Crush also supports the Claude Code hook output format:
+GiiS-Code also supports the Claude Code hook output format:
 
 ```json
 {

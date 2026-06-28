@@ -17,9 +17,9 @@ import (
 
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/catwalk/pkg/embedded"
-	"github.com/charmbracelet/crush/internal/agent/hyper"
-	"github.com/charmbracelet/crush/internal/csync"
-	"github.com/charmbracelet/crush/internal/home"
+	"github.com/GiiS-AI/GiiS-Code/internal/agent/hyper"
+	"github.com/GiiS-AI/GiiS-Code/internal/csync"
+	"github.com/GiiS-AI/GiiS-Code/internal/home"
 	"github.com/charmbracelet/x/etag"
 )
 
@@ -41,8 +41,8 @@ func cachePathFor(name string) string {
 	}
 
 	// return the path to the main data directory
-	// for windows, it should be in `%LOCALAPPDATA%/crush/`
-	// for linux and macOS, it should be in `$HOME/.local/share/crush/`
+	// for windows, it should be in `%LOCALAPPDATA%/giis-code/`
+	// for linux and macOS, it should be in `$HOME/.local/share/giis-code/`
 	if runtime.GOOS == "windows" {
 		localAppData := os.Getenv("LOCALAPPDATA")
 		if localAppData == "" {
@@ -123,8 +123,11 @@ func UpdateHyper(pathOrURL string) error {
 }
 
 var (
-	catwalkSyncer = &catwalkSync{}
-	hyperSyncer   = &hyperSync{}
+	catwalkSyncer              = &catwalkSync{}
+	hyperSyncer                = &hyperSync{}
+	bridgeSyncer               = &bridgeSync{}
+	cloudSyncer                = &cloudSync{}
+	bridgeSource  bridgeClient = realBridgeClient{}
 )
 
 // Providers returns the list of providers, taking into account cached results
@@ -149,6 +152,10 @@ func Providers(cfg *Config) ([]catwalk.Provider, error) {
 
 		var hyperProvider catwalk.Provider
 		var hyperFound bool
+		var bridgeProvider catwalk.Provider
+		var bridgeFound bool
+		var cloudProvider catwalk.Provider
+		var cloudFound bool
 
 		wg.Go(func() {
 			if customProvidersOnly {
@@ -162,7 +169,7 @@ func Providers(cfg *Config) ([]catwalk.Provider, error) {
 			items, err := catwalkSyncer.Get(ctx)
 			if err != nil {
 				catwalkURL := fmt.Sprintf("%s/v2/providers", cmp.Or(os.Getenv("CATWALK_URL"), defaultCatwalkURL))
-				errs = append(errs, fmt.Errorf("Crush was unable to fetch an updated list of providers from %s. Consider setting CRUSH_DISABLE_PROVIDER_AUTO_UPDATE=1 to use the embedded providers bundled at the time of this Crush release. You can also update providers manually. For more info see crush update-providers --help.\n\nCause: %w", catwalkURL, err)) //nolint:staticcheck
+				errs = append(errs, fmt.Errorf("GiiS-Code was unable to fetch an updated list of providers from %s. Consider setting CRUSH_DISABLE_PROVIDER_AUTO_UPDATE=1 to use the embedded providers bundled at the time of this GiiS-Code release. You can also update providers manually. For more info see giis-code update-providers --help.\n\nCause: %w", catwalkURL, err)) //nolint:staticcheck
 				return
 			}
 			providers.Append(items...)
@@ -177,11 +184,43 @@ func Providers(cfg *Config) ([]catwalk.Provider, error) {
 
 			item, err := hyperSyncer.Get(ctx)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("Crush was unable to fetch updated information from Hyper: %w", err)) //nolint:staticcheck
+				errs = append(errs, fmt.Errorf("GiiS-Code was unable to fetch updated information from Hyper: %w", err)) //nolint:staticcheck
 				return
 			}
 			hyperProvider = item
 			hyperFound = true
+		})
+
+		wg.Go(func() {
+			if customProvidersOnly {
+				return
+			}
+			path := cloudCachePath()
+			cloudSyncer.Init(realCloudClient{}, path, autoupdate)
+			item, err := cloudSyncer.Get(ctx)
+			if err != nil {
+				return
+			}
+			cloudProvider = item
+			cloudFound = true
+		})
+
+		wg.Go(func() {
+			if customProvidersOnly {
+				return
+			}
+			path := bridgeCachePath()
+			bridgeSyncer.Init(bridgeSource, path, autoupdate)
+
+			item, err := bridgeSyncer.Get(ctx)
+			if err != nil {
+				return
+			}
+			if item.ID == "" {
+				return
+			}
+			bridgeProvider = item
+			bridgeFound = true
 		})
 
 		wg.Wait()
@@ -190,6 +229,12 @@ func Providers(cfg *Config) ([]catwalk.Provider, error) {
 			providerList = append([]catwalk.Provider{hyperProvider}, slices.Collect(providers.Seq())...)
 		} else {
 			providerList = slices.Collect(providers.Seq())
+		}
+		if cloudFound {
+			providerList = append([]catwalk.Provider{cloudProvider}, providerList...)
+		}
+		if bridgeFound {
+			providerList = append([]catwalk.Provider{bridgeProvider}, providerList...)
 		}
 		providerErr = errors.Join(errs...)
 	})

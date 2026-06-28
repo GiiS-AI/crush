@@ -17,6 +17,11 @@ func resetProviderState() {
 	providerErr = nil
 	catwalkSyncer = &catwalkSync{}
 	hyperSyncer = &hyperSync{}
+	bridgeSyncer = &bridgeSync{}
+	cloudSyncer = &cloudSync{}
+	bridgeSource = realBridgeClient{}
+	_ = os.Setenv("GIIS_CLOUD_URL", "http://127.0.0.1:1/api/v1")
+	_ = os.Setenv("GIIS_BRIDGE_URL", "http://127.0.0.1:1/v1")
 }
 
 func TestProviders_Integration_AutoUpdateDisabled(t *testing.T) {
@@ -77,8 +82,8 @@ func TestProviders_Integration_WithMockClients(t *testing.T) {
 		},
 	}
 
-	catwalkPath := tmpDir + "/crush/providers.json"
-	hyperPath := tmpDir + "/crush/hyper.json"
+	catwalkPath := tmpDir + "/giis-code/providers.json"
+	hyperPath := tmpDir + "/giis-code/hyper.json"
 
 	testCatwalkSyncer.Init(mockCatwalkClient, catwalkPath, true)
 	testHyperSyncer.Init(mockHyperClient, hyperPath, true)
@@ -102,10 +107,10 @@ func TestProviders_Integration_WithCachedData(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", tmpDir)
 
 	// Create cache files.
-	catwalkPath := tmpDir + "/crush/providers.json"
-	hyperPath := tmpDir + "/crush/hyper.json"
+	catwalkPath := tmpDir + "/giis-code/providers.json"
+	hyperPath := tmpDir + "/giis-code/hyper.json"
 
-	require.NoError(t, os.MkdirAll(tmpDir+"/crush", 0o755))
+	require.NoError(t, os.MkdirAll(tmpDir+"/giis-code", 0o755))
 
 	// Write Catwalk cache.
 	catwalkProviders := []catwalk.Provider{
@@ -172,8 +177,8 @@ func TestProviders_Integration_CatwalkFailsHyperSucceeds(t *testing.T) {
 		},
 	}
 
-	catwalkPath := tmpDir + "/crush/providers.json"
-	hyperPath := tmpDir + "/crush/hyper.json"
+	catwalkPath := tmpDir + "/giis-code/providers.json"
+	hyperPath := tmpDir + "/giis-code/hyper.json"
 
 	testCatwalkSyncer.Init(mockCatwalkClient, catwalkPath, true)
 	testHyperSyncer.Init(mockHyperClient, hyperPath, true)
@@ -202,8 +207,8 @@ func TestProviders_Integration_BothFail(t *testing.T) {
 		provider: catwalk.Provider{}, // Empty provider.
 	}
 
-	catwalkPath := tmpDir + "/crush/providers.json"
-	hyperPath := tmpDir + "/crush/hyper.json"
+	catwalkPath := tmpDir + "/giis-code/providers.json"
+	hyperPath := tmpDir + "/giis-code/hyper.json"
 
 	testCatwalkSyncer.Init(mockCatwalkClient, catwalkPath, true)
 	testHyperSyncer.Init(mockHyperClient, hyperPath, true)
@@ -279,7 +284,7 @@ func TestCachePathFor(t *testing.T) {
 		{
 			name:        "with XDG_DATA_HOME",
 			xdgDataHome: "/custom/data",
-			expected:    "/custom/data/crush/providers.json",
+			expected:    "/custom/data/giis-code/providers.json",
 		},
 		{
 			name:        "without XDG_DATA_HOME",
@@ -300,7 +305,7 @@ func TestCachePathFor(t *testing.T) {
 			if tt.expected != "" {
 				require.Equal(t, tt.expected, filepath.ToSlash(result))
 			} else {
-				require.Contains(t, result, "crush")
+				require.Contains(t, result, "giis-code")
 				require.Contains(t, result, "providers.json")
 			}
 		})

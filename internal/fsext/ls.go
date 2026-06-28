@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/GiiS-AI/GiiS-Code/internal/csync"
+	"github.com/GiiS-AI/GiiS-Code/internal/home"
 	"github.com/charlievieth/fastwalk"
-	"github.com/charmbracelet/crush/internal/csync"
-	"github.com/charmbracelet/crush/internal/home"
 	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 )
@@ -34,7 +34,7 @@ var fastIgnoreDirs = map[string]bool{
 	".Trash":          true,
 	".Spotlight-V100": true,
 	".fseventsd":      true,
-	".crush":          true,
+	".giis-code":      true,
 	"OrbStack":        true,
 	".local":          true,
 	".share":          true,
@@ -109,13 +109,13 @@ var gitGlobalIgnorePatterns = sync.OnceValue(func() []gitignore.Pattern {
 })
 
 // crushGlobalIgnorePatterns returns patterns from the user's
-// ~/.config/crush/ignore file.
+// ~/.config/giis-code/ignore file.
 var crushGlobalIgnorePatterns = sync.OnceValue(func() []gitignore.Pattern {
-	name := filepath.Join(home.Config(), "crush", "ignore")
+	name := filepath.Join(home.Config(), "giis-code", "ignore")
 	bts, err := os.ReadFile(name)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			slog.Debug("Failed to read crush global ignore file", "path", name, "error", err)
+			slog.Debug("Failed to read giis-code global ignore file", "path", name, "error", err)
 		}
 		return nil
 	}
@@ -197,7 +197,7 @@ func (dl *directoryLister) getCombinedMatcher(dir string) gitignore.Matcher {
 		// Add common patterns first (lowest priority).
 		allPatterns = append(allPatterns, commonIgnorePatterns()...)
 
-		// Add global ignore patterns (git core.excludesFile + crush global ignore).
+		// Add global ignore patterns (git core.excludesFile + giis-code global ignore).
 		allPatterns = append(allPatterns, gitGlobalIgnorePatterns()...)
 		allPatterns = append(allPatterns, crushGlobalIgnorePatterns()...)
 

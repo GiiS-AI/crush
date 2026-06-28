@@ -8,8 +8,8 @@ import (
 	"os/signal"
 
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/crush/internal/client"
-	"github.com/charmbracelet/crush/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/client"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 )
@@ -23,21 +23,33 @@ var (
 var logoutCmd = &cobra.Command{
 	Aliases: []string{"signout"},
 	Use:     "logout [platform]",
-	Short:   "Logout Crush from a platform",
-	Long: `Logout Crush from a specified platform, removing stored credentials.
+	Short:   "Logout GiiS-Code from a platform",
+	Long: `Logout GiiS-Code from a specified platform, removing stored credentials.
 The platform should be provided as an argument.
 If no argument is given, a list of logged-in platforms will be shown.
-Available platforms are: hyper, copilot.`,
+Available platforms are: hyper, copilot, giis-cloud, claude, codex.`,
 	Example: `
 # Sign out from Charm Hyper
-crush logout hyper
+c0d3r logout hyper
 
-# Sign out from GitHub Copilot
-crush logout copilot
-  `,
+	# Sign out from GitHub Copilot
+	c0d3r logout copilot
+
+	# Sign out from GiiS Cloud
+	c0d3r logout giis-cloud
+
+	# Sign out from Claude
+	c0d3r logout claude
+
+	# Sign out from Codex
+	c0d3r logout codex
+	  `,
 	ValidArgs: []cobra.Completion{
 		"hyper",
 		"copilot",
+		"giis-cloud",
+		"claude",
+		"codex",
 		"github",
 		"github-copilot",
 	},
@@ -84,6 +96,12 @@ crush logout copilot
 			return logoutHyper(c, ws.ID)
 		case "copilot", "github", "github-copilot":
 			return logoutCopilot(c, ws.ID)
+		case "giis-cloud":
+			return logoutGiiSCloud(c, ws.ID)
+		case "claude":
+			return logoutClaude(c, ws.ID)
+		case "codex":
+			return logoutCodex(c, ws.ID)
 		default:
 			return fmt.Errorf("unknown platform: %s", provider)
 		}
@@ -115,6 +133,79 @@ func logoutCopilot(c *client.Client, wsID string) error {
 	}
 
 	fmt.Println(logoutHeaderStyle.Render("Successfully logged out of GitHub Copilot."))
+	return nil
+}
+
+func logoutGiiSCloud(c *client.Client, wsID string) error {
+	ctx := getLogoutContext()
+
+	cfg, err := c.GetConfig(ctx, wsID)
+	if err != nil {
+		return err
+	}
+	pc, _ := cfg.Providers.Get("giis-cloud")
+	apiKey := pc.APIKey
+
+	var tokenID int
+	if pc.ProviderOptions != nil {
+		if raw, ok := pc.ProviderOptions["cloud_token_id"]; ok {
+			switch v := raw.(type) {
+			case float64:
+				tokenID = int(v)
+			case int:
+				tokenID = v
+			case int64:
+				tokenID = int(v)
+			}
+		}
+	}
+
+	if tokenID == 0 && apiKey != "" {
+		if id, ok, err := config.LookupCloudTokenID(ctx, apiKey); err == nil && ok {
+			tokenID = id
+		}
+	}
+
+	if tokenID != 0 && apiKey != "" {
+		if err := config.RevokeCloudToken(ctx, apiKey, tokenID); err != nil {
+			fmt.Println(logoutPromptStyle.Render(fmt.Sprintf("Could not revoke the server token (%v). Removing local credentials only.", err)))
+		} else {
+			fmt.Println(logoutHeaderStyle.Render("Successfully revoked the GiiS Cloud token."))
+		}
+	} else {
+		fmt.Println(logoutPromptStyle.Render("Could not resolve the server token id. Removing local credentials only."))
+	}
+
+	if err := c.RemoveConfigField(ctx, wsID, config.ScopeGlobal, "providers.giis-cloud.api_key"); err != nil {
+		return err
+	}
+	if err := c.RemoveConfigField(ctx, wsID, config.ScopeGlobal, "providers.giis-cloud.provider_options.cloud_token_id"); err != nil {
+		return err
+	}
+
+	fmt.Println(logoutHeaderStyle.Render("Successfully logged out of GiiS Cloud."))
+	return nil
+}
+
+func logoutClaude(c *client.Client, wsID string) error {
+	ctx := getLogoutContext()
+
+	if err := c.RemoveConfigField(ctx, wsID, config.ScopeGlobal, "providers.claude.oauth"); err != nil {
+		return err
+	}
+
+	fmt.Println(logoutHeaderStyle.Render("Successfully logged out of Claude."))
+	return nil
+}
+
+func logoutCodex(c *client.Client, wsID string) error {
+	ctx := getLogoutContext()
+
+	if err := c.RemoveConfigField(ctx, wsID, config.ScopeGlobal, "providers.codex.oauth"); err != nil {
+		return err
+	}
+
+	fmt.Println(logoutHeaderStyle.Render("Successfully logged out of Codex."))
 	return nil
 }
 

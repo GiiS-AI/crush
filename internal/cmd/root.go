@@ -23,23 +23,23 @@ import (
 	tea "charm.land/bubbletea/v2"
 	fang "charm.land/fang/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/GiiS-AI/GiiS-Code/internal/app"
+	"github.com/GiiS-AI/GiiS-Code/internal/client"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/db"
+	"github.com/GiiS-AI/GiiS-Code/internal/event"
+	"github.com/GiiS-AI/GiiS-Code/internal/lock"
+	crushlog "github.com/GiiS-AI/GiiS-Code/internal/log"
+	"github.com/GiiS-AI/GiiS-Code/internal/projects"
+	"github.com/GiiS-AI/GiiS-Code/internal/proto"
+	"github.com/GiiS-AI/GiiS-Code/internal/server"
+	"github.com/GiiS-AI/GiiS-Code/internal/session"
+	"github.com/GiiS-AI/GiiS-Code/internal/skills"
+	"github.com/GiiS-AI/GiiS-Code/internal/ui/common"
+	ui "github.com/GiiS-AI/GiiS-Code/internal/ui/model"
+	"github.com/GiiS-AI/GiiS-Code/internal/version"
+	"github.com/GiiS-AI/GiiS-Code/internal/workspace"
 	"github.com/charmbracelet/colorprofile"
-	"github.com/charmbracelet/crush/internal/app"
-	"github.com/charmbracelet/crush/internal/client"
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/db"
-	"github.com/charmbracelet/crush/internal/event"
-	"github.com/charmbracelet/crush/internal/lock"
-	crushlog "github.com/charmbracelet/crush/internal/log"
-	"github.com/charmbracelet/crush/internal/projects"
-	"github.com/charmbracelet/crush/internal/proto"
-	"github.com/charmbracelet/crush/internal/server"
-	"github.com/charmbracelet/crush/internal/session"
-	"github.com/charmbracelet/crush/internal/skills"
-	"github.com/charmbracelet/crush/internal/ui/common"
-	ui "github.com/charmbracelet/crush/internal/ui/model"
-	"github.com/charmbracelet/crush/internal/version"
-	"github.com/charmbracelet/crush/internal/workspace"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/charmtone"
@@ -52,9 +52,9 @@ var clientHost string
 
 func init() {
 	rootCmd.PersistentFlags().StringP("cwd", "c", "", "Current working directory")
-	rootCmd.PersistentFlags().StringP("data-dir", "D", "", "Custom crush data directory")
+	rootCmd.PersistentFlags().StringP("data-dir", "D", "", "Custom giis-code data directory")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug")
-	rootCmd.PersistentFlags().StringVarP(&clientHost, "host", "H", server.DefaultHost(), "Connect to a specific crush server host (for advanced users)")
+	rootCmd.PersistentFlags().StringVarP(&clientHost, "host", "H", server.DefaultHost(), "Connect to a specific giis-code server host (for advanced users)")
 	rootCmd.Flags().BoolP("help", "h", false, "Help")
 	rootCmd.Flags().BoolP("yolo", "y", false, "Automatically accept all permissions (dangerous mode)")
 	rootCmd.Flags().StringP("session", "s", "", "Continue a previous session by ID")
@@ -76,33 +76,34 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "crush",
-	Short: "A terminal-first AI assistant for software development",
-	Long:  "A glamorous, terminal-first AI assistant for software development and adjacent tasks",
+	Use:     "c0d3r",
+	Aliases: []string{"giis-code"},
+	Short:   "A terminal-first AI assistant for the GiiS platform",
+	Long:    "A terminal-first AI coding assistant for the GiiS platform and adjacent tasks",
 	Example: `
 # Run in interactive mode
-crush
+c0d3r
 
 # Run non-interactively
-crush run "Guess my 5 favorite Pokémon"
+c0d3r run "Guess my 5 favorite Pokémon"
 
 # Run a non-interactively with pipes and redirection
-cat README.md | crush run "make this more glamorous" > GLAMOROUS_README.md
+cat README.md | c0d3r run "make this more glamorous" > GLAMOROUS_README.md
 
 # Run with debug logging in a specific directory
-crush --debug --cwd /path/to/project
+c0d3r --debug --cwd /path/to/project
 
 # Run in yolo mode (auto-accept all permissions; use with care)
-crush --yolo
+c0d3r --yolo
 
 # Run with custom data directory
-crush --data-dir /path/to/custom/.crush
+c0d3r --data-dir /path/to/custom/.giis-code
 
 # Continue a previous session
-crush --session {session-id}
+c0d3r --session {session-id}
 
 # Continue the most recent session
-crush --continue
+c0d3r --continue
   `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessionID, _ := cmd.Flags().GetString("session")
@@ -140,7 +141,7 @@ crush --continue
 		if _, err := program.Run(); err != nil {
 			event.Error(err)
 			slog.Error("TUI run error", "error", err)
-			return errors.New("Crush crashed. If metrics are enabled, we were notified about it. If you'd like to report it, please copy the stacktrace above and open an issue at https://github.com/charmbracelet/crush/issues/new?template=bug.yml") //nolint:staticcheck
+			return errors.New("GiiS-Code crashed. If metrics are enabled, we were notified about it. If you'd like to report it, please copy the stacktrace above and open an issue at https://github.com/GiiS-AI/GiiS-Code/issues/new?template=bug.yml") //nolint:staticcheck
 		}
 		return nil
 	},
@@ -286,7 +287,7 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 		return nil, nil, err
 	}
 
-	logFile := filepath.Join(cfg.Options.DataDirectory, "logs", "crush.log")
+	logFile := filepath.Join(cfg.Options.DataDirectory, "logs", "giis-code.log")
 	crushlog.Setup(logFile, debug)
 
 	// Discover skills once before app.New. Local mode hosts a single
@@ -404,7 +405,7 @@ func connectToServer(cmd *cobra.Command) (*client.Client, *proto.Workspace, func
 	}
 
 	if ws.Config != nil {
-		logFile := filepath.Join(ws.Config.Options.DataDirectory, "logs", "crush.log")
+		logFile := filepath.Join(ws.Config.Options.DataDirectory, "logs", "giis-code.log")
 		crushlog.Setup(logFile, debug)
 	}
 
@@ -422,7 +423,7 @@ func ensureServer(cmd *cobra.Command, hostURL *url.URL) error {
 	// server log file. crushlog.Setup uses sync.Once internally, so the
 	// later call from connectToServer becomes a no-op.
 	debug, _ := cmd.Flags().GetBool("debug")
-	logFile := filepath.Join(config.GlobalCacheDir(), "server-"+safeHostName(hostURL), "crush.log")
+	logFile := filepath.Join(config.GlobalCacheDir(), "server-"+safeHostName(hostURL), "giis-code.log")
 	crushlog.Setup(logFile, debug)
 
 	switch hostURL.Scheme {
@@ -471,13 +472,13 @@ func ensureServer(cmd *cobra.Command, hostURL *url.URL) error {
 
 		if needsStart {
 			if err := spawnAndWaitReady(cmd, hostURL); err != nil {
-				return fmt.Errorf("failed to initialize crush server: %v", err)
+				return fmt.Errorf("failed to initialize giis-code server: %v", err)
 			}
 			return nil
 		}
 
 		if err := waitForServerReady(cmd.Context(), hostURL); err != nil {
-			return fmt.Errorf("failed to initialize crush server: %v", err)
+			return fmt.Errorf("failed to initialize giis-code server: %v", err)
 		}
 	}
 
@@ -486,7 +487,7 @@ func ensureServer(cmd *cobra.Command, hostURL *url.URL) error {
 
 // spawnAndWaitReady serializes the spawn-and-wait-for-readiness sequence
 // across concurrent clients via an exclusive flock on
-// $XDG_CACHE_HOME/crush/server-<safeHost>/start.lock.
+// $XDG_CACHE_HOME/giis-code/server-<safeHost>/start.lock.
 //
 // After acquiring the lock it re-probes readiness so that a client that
 // blocked while another client was spawning can skip its own spawn and
@@ -751,11 +752,11 @@ func startDetachedServer(cmd *cobra.Command, hostURL *url.URL) error {
 	c.Stderr = stderr
 
 	if err := c.Start(); err != nil {
-		return fmt.Errorf("failed to start crush server: %v", err)
+		return fmt.Errorf("failed to start giis-code server: %v", err)
 	}
 
 	if err := c.Process.Release(); err != nil {
-		return fmt.Errorf("failed to detach crush server process: %v", err)
+		return fmt.Errorf("failed to detach giis-code server process: %v", err)
 	}
 
 	return nil

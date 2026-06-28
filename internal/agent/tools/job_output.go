@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
-	"github.com/charmbracelet/crush/internal/shell"
+	"github.com/GiiS-AI/GiiS-Code/internal/shell"
 )
 
 const (

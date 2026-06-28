@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/env"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/env"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -36,7 +36,7 @@ func TestMCPSession_CancelOnClose(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	client := mcp.NewClient(&mcp.Implementation{Name: "crush-test"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "giis-code-test"}, nil)
 	clientSession, err := client.Connect(ctx, clientTransport, nil)
 	require.NoError(t, err)
 

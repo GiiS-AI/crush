@@ -91,6 +91,9 @@ func ReadContent(active []*Skill, skillPaths []string, workingDir string, skillI
 		embeddedPath := "builtin/" + strings.TrimPrefix(skill.SkillFilePath, BuiltinPrefix)
 		content, err := BuiltinFS().ReadFile(embeddedPath)
 		if err != nil {
+			if skill.Instructions != "" {
+				return builtinSkillMarkdown(skill), result, nil
+			}
 			return nil, SkillReadResult{}, fmt.Errorf("read builtin skill %q: %w", skillID, err)
 		}
 		return content, result, nil
@@ -101,6 +104,23 @@ func ReadContent(active []*Skill, skillPaths []string, workingDir string, skillI
 		return nil, SkillReadResult{}, fmt.Errorf("read skill %q: %w", skillID, err)
 	}
 	return content, result, nil
+}
+
+func builtinSkillMarkdown(skill *Skill) []byte {
+	var b strings.Builder
+	b.WriteString("---\n")
+	fmt.Fprintf(&b, "name: %s\n", skill.Name)
+	fmt.Fprintf(&b, "description: %s\n", skill.Description)
+	if skill.UserInvocable {
+		b.WriteString("user-invocable: true\n")
+	}
+	if skill.DisableModelInvocation {
+		b.WriteString("disable-model-invocation: true\n")
+	}
+	b.WriteString("---\n\n")
+	b.WriteString(strings.TrimSpace(skill.Instructions))
+	b.WriteByte('\n')
+	return []byte(b.String())
 }
 
 func skillLabel(skillPaths []string, workingDir string, skill *Skill) (string, SourceType) {

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GiiS-AI/GiiS-Code/internal/csync"
+	"github.com/GiiS-AI/GiiS-Code/internal/home"
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/charlievieth/fastwalk"
-	"github.com/charmbracelet/crush/internal/csync"
-	"github.com/charmbracelet/crush/internal/home"
 )
 
 type FileInfo struct {
@@ -28,7 +28,7 @@ func SkipHidden(path string) bool {
 	}
 
 	commonIgnoredDirs := map[string]bool{
-		".crush":           true,
+		".giis-code":       true,
 		"node_modules":     true,
 		"vendor":           true,
 		"dist":             true,

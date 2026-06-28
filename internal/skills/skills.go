@@ -14,8 +14,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
 	"github.com/charlievieth/fastwalk"
-	"github.com/charmbracelet/crush/internal/pubsub"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,6 +32,9 @@ var (
 
 	latestStates   []*SkillState
 	latestStatesMu sync.RWMutex
+
+	builtinProviders   []func() ([]*Skill, []*SkillState)
+	builtinProvidersMu sync.RWMutex
 )
 
 // Skill represents a parsed SKILL.md file.
@@ -82,6 +85,13 @@ func SubscribeEvents(ctx context.Context) <-chan pubsub.Event[Event] {
 // PublishStates publishes a skill discovery event with the given states.
 func PublishStates(states []*SkillState) {
 	broker.Publish(pubsub.UpdatedEvent, Event{States: cloneStates(states)})
+}
+
+// RegisterBuiltinProvider registers a dynamic builtin skill provider.
+func RegisterBuiltinProvider(provider func() ([]*Skill, []*SkillState)) {
+	builtinProvidersMu.Lock()
+	builtinProviders = append(builtinProviders, provider)
+	builtinProvidersMu.Unlock()
 }
 
 // cloneStates returns a deep copy of the given state slice so callers cannot

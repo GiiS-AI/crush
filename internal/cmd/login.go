@@ -6,15 +6,19 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/crush/internal/client"
-	"github.com/charmbracelet/crush/internal/clipboard"
-	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/oauth"
-	"github.com/charmbracelet/crush/internal/oauth/copilot"
-	"github.com/charmbracelet/crush/internal/oauth/hyper"
+	"github.com/GiiS-AI/GiiS-Code/internal/client"
+	"github.com/GiiS-AI/GiiS-Code/internal/clipboard"
+	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth/claude"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth/codex"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth/copilot"
+	"github.com/GiiS-AI/GiiS-Code/internal/oauth/hyper"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/term"
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 )
@@ -22,23 +26,35 @@ import (
 var loginCmd = &cobra.Command{
 	Aliases: []string{"auth"},
 	Use:     "login [platform]",
-	Short:   "Login Crush to a platform",
-	Long: `Login Crush to a specified platform.
+	Short:   "Login GiiS-Code to a platform",
+	Long: `Login GiiS-Code to a specified platform.
 The platform should be provided as an argument.
-Available platforms are: hyper, copilot.`,
+Available platforms are: hyper, copilot, giis-cloud, claude, codex.`,
 	Example: `
 # Authenticate with Charm Hyper
-crush login
+c0d3r login
 
-# Authenticate with GitHub Copilot
-crush login copilot
+	# Authenticate with GitHub Copilot
+	c0d3r login copilot
 
-# Force re-authentication even if already logged in
-crush login -f copilot
+	# Authenticate with GiiS Cloud using your account credentials
+	c0d3r login giis-cloud
+
+	# Authenticate with Claude
+	c0d3r login claude
+
+	# Authenticate with Codex
+	c0d3r login codex
+
+	# Force re-authentication even if already logged in
+	c0d3r login -f copilot
   `,
 	ValidArgs: []cobra.Completion{
 		"hyper",
 		"copilot",
+		"giis-cloud",
+		"claude",
+		"codex",
 		"github",
 		"github-copilot",
 	},
@@ -66,8 +82,14 @@ crush login -f copilot
 			return loginHyper(c, ws.ID, force)
 		case "copilot", "github", "github-copilot":
 			return loginCopilot(c, ws.ID, force)
+		case "giis-cloud":
+			return loginGiiSCloud(c, ws.ID, force)
+		case "claude":
+			return loginClaude(c, ws.ID, force)
+		case "codex":
+			return loginCodex(c, ws.ID, force)
 		default:
-			return fmt.Errorf("unknown platform: %s", args[0])
+			return fmt.Errorf("unknown platform: %s", provider)
 		}
 	},
 }
@@ -214,6 +236,119 @@ func loginCopilot(c *client.Client, wsID string, force bool) error {
 	return nil
 }
 
+func loginGiiSCloud(c *client.Client, wsID string, force bool) error {
+	ctx := getLoginContext()
+
+	if !force {
+		cfg, err := c.GetConfig(ctx, wsID)
+		if err == nil && cfg != nil {
+			if pc, ok := cfg.Providers.Get("giis-cloud"); ok && pc.APIKey != "" {
+				fmt.Println("You are already logged in to GiiS Cloud.")
+				fmt.Println("Use --force to re-authenticate.")
+				return nil
+			}
+		}
+	}
+
+	username, err := readLine("GiiS Cloud email: ")
+	if err != nil {
+		return err
+	}
+	password, err := readSecretLine("GiiS Cloud password: ")
+	if err != nil {
+		return err
+	}
+	if username == "" || password == "" {
+		return fmt.Errorf("username and password are required")
+	}
+
+	token, err := config.LoginCloudAndCreatePAT(ctx, username, password, "giis-code", nil)
+	if err != nil {
+		return err
+	}
+
+	if err := c.SetProviderAPIKey(ctx, wsID, config.ScopeGlobal, "giis-cloud", token.Token); err != nil {
+		return err
+	}
+	if err := c.SetConfigField(ctx, wsID, config.ScopeGlobal, "providers.giis-cloud.provider_options.cloud_token_id", token.ID); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Println("You're now authenticated with GiiS Cloud!")
+	return nil
+}
+
+func loginClaude(c *client.Client, wsID string, force bool) error {
+	ctx := getLoginContext()
+
+	if !force {
+		cfg, err := c.GetConfig(ctx, wsID)
+		if err == nil && cfg != nil {
+			if pc, ok := cfg.Providers.Get("claude"); ok && pc.OAuthToken != nil {
+				fmt.Println("You are already logged in to Claude.")
+				fmt.Println("Use --force to re-authenticate.")
+				return nil
+			}
+		}
+	}
+
+	fmt.Println("Prompting for Claude API key...")
+	key, err := claude.PromptForAPIKey(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("failed to read API key: %w", err)
+	}
+
+	fmt.Println("Validating Claude API key...")
+	if err := claude.ValidateAPIKey(ctx, key); err != nil {
+		return fmt.Errorf("invalid API key: %w", err)
+	}
+
+	token := claude.TokenFromAPIKey(key)
+	if err := c.SetConfigField(ctx, wsID, config.ScopeGlobal, "providers.claude.oauth", token); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Println("You're now authenticated with Claude!")
+	return nil
+}
+
+func loginCodex(c *client.Client, wsID string, force bool) error {
+	ctx := getLoginContext()
+
+	if !force {
+		cfg, err := c.GetConfig(ctx, wsID)
+		if err == nil && cfg != nil {
+			if pc, ok := cfg.Providers.Get("codex"); ok && pc.OAuthToken != nil {
+				fmt.Println("You are already logged in to Codex.")
+				fmt.Println("Use --force to re-authenticate.")
+				return nil
+			}
+		}
+	}
+
+	fmt.Println("Prompting for Codex/OpenAI API key...")
+	key, err := codex.PromptForAPIKey(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("failed to read API key: %w", err)
+	}
+
+	fmt.Println("Validating Codex/OpenAI API key...")
+	if err := codex.ValidateAPIKey(ctx, key); err != nil {
+		return fmt.Errorf("invalid API key: %w", err)
+	}
+
+	token := codex.TokenFromAPIKey(key)
+	if err := c.SetConfigField(ctx, wsID, config.ScopeGlobal, "providers.codex.oauth", token); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Println("You're now authenticated with Codex!")
+	return nil
+}
+
 func getLoginContext() context.Context {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	go func() {
@@ -226,4 +361,28 @@ func getLoginContext() context.Context {
 
 func waitEnter() {
 	_, _ = fmt.Scanln()
+}
+
+func readSecretLine(prompt string) (string, error) {
+	fmt.Print(prompt)
+	if term.IsTerminal(os.Stdin.Fd()) {
+		b, err := term.ReadPassword(os.Stdin.Fd())
+		fmt.Println()
+		return strings.TrimSpace(string(b)), err
+	}
+
+	var input string
+	if _, err := fmt.Fscanln(os.Stdin, &input); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(input), nil
+}
+
+func readLine(prompt string) (string, error) {
+	fmt.Print(prompt)
+	var input string
+	if _, err := fmt.Fscanln(os.Stdin, &input); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(input), nil
 }
