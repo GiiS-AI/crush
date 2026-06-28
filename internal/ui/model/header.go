@@ -46,15 +46,15 @@ func newHeader(com *common.Common) *header {
 func (h *header) refresh() {
 	t := h.com.Styles
 	isHyper := h.com.IsHyper()
-	charm := "Charm™"
+	cliName := "c0d3r"
 	if !isHyper {
-		charm = " " + charm
+		cliName = " " + cliName
 	}
 	name := "GiiS"
 	if isHyper {
 		name = "GiiS PRO"
 	}
-	h.compactLogo = t.Header.Charm.Render(charm) + " " +
+	h.compactLogo = t.Header.Charm.Render(cliName) + " " +
 		styles.ApplyBoldForegroundGrad(t.Header.LogoGradCanvas, name, t.Header.LogoGradFromColor, t.Header.LogoGradToColor) + " "
 	// Force drawHeader to re-render the wide logo on the next frame.
 	h.width = 0
