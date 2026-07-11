@@ -11,6 +11,9 @@ import (
 func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	path = filepath.Clean(path)
 	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
 	f, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
 	if err != nil {
 		return err

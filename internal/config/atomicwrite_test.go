@@ -27,6 +27,21 @@ func TestAtomicWriteFile(t *testing.T) {
 	require.Equal(t, "test.json", entries[0].Name())
 }
 
+func TestAtomicWriteFile_CreatesMissingParentDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	// Matches the real first-run scenario: ~/.local/share/giis-code/ doesn't
+	// exist yet the first time a config value (e.g. a provider API key) is
+	// saved, since nothing creates it ahead of time.
+	path := filepath.Join(dir, "giis-code", "giis-code.json")
+
+	require.NoError(t, atomicWriteFile(path, []byte(`{"key":"value"}`), 0o600))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, `{"key":"value"}`, string(data))
+}
+
 func TestAtomicWriteFile_PermissionsApplied(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows does not support Unix file permissions")
