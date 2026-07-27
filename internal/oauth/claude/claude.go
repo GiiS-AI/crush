@@ -73,14 +73,19 @@ func PromptForAPIKey(stdin io.Reader) (string, error) {
 	return key, nil
 }
 
-// ValidateAPIKey tests the Claude API key by calling the models endpoint.
+// ValidateAPIKey tests a Claude credential by calling the models endpoint.
+// ReadStoredCredentials returns an OAuth access token (Claude Pro/Max
+// subscription, "sk-ant-oat01-..."), not a raw API key - those authenticate
+// via "Authorization: Bearer", never "x-api-key" (that header is for actual
+// API keys from console.anthropic.com and rejects OAuth tokens with 401,
+// even though the token itself is valid). Confirmed against the real API.
 func ValidateAPIKey(ctx context.Context, key string) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("x-api-key", key)
+	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
 	client := &http.Client{Timeout: 10 * time.Second}
