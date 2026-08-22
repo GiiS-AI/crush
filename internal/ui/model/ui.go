@@ -2595,7 +2595,7 @@ func (m *UI) FullHelp() [][]key.Binding {
 	var binds [][]key.Binding
 	k := &m.keyMap
 	help := k.Help
-	help.SetHelp("ctrl+g", "less")
+	help.SetHelp("ctrl+a", "less")
 	hasAttachments := len(m.attachments.List()) > 0
 	hasSession := m.hasSession()
 	commands := k.Commands
