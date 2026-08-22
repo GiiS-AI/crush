@@ -219,6 +219,23 @@ func Providers(cfg *Config) ([]catwalk.Provider, error) {
 			if item.ID == "" {
 				return
 			}
+			// The bridge aggregates models discovered from other backends
+			// (e.g. "giis-local/codex") under its own listing. If that
+			// backend is itself a separately configured provider, drop the
+			// duplicate here rather than let it appear paired with the
+			// bridge - selecting it there would persist a provider/model
+			// pairing the bridge's own endpoint can't actually serve, since
+			// it's really reachable through the other provider's endpoint.
+			filtered := item.Models[:0]
+			for _, model := range item.Models {
+				if prefix, _, ok := strings.Cut(model.ID, "/"); ok {
+					if _, exists := cfg.Providers.Get(prefix); exists {
+						continue
+					}
+				}
+				filtered = append(filtered, model)
+			}
+			item.Models = filtered
 			bridgeProvider = item
 			bridgeFound = true
 		})
