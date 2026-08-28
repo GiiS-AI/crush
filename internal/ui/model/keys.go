@@ -76,16 +76,16 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("ctrl+c", "quit"),
 		),
 		Help: key.NewBinding(
-			key.WithKeys("ctrl+a"),
-			key.WithHelp("ctrl+a", "more"),
+			key.WithKeys("ctrl+g"),
+			key.WithHelp("ctrl+g", "more"),
 		),
 		Commands: key.NewBinding(
-			key.WithKeys("ctrl+q"),
-			key.WithHelp("ctrl+q", "commands"),
+			key.WithKeys("ctrl+p"),
+			key.WithHelp("ctrl+p", "commands"),
 		),
 		Models: key.NewBinding(
 			key.WithKeys("ctrl+m", "ctrl+l"),
-			key.WithHelp("ctrl+m", "models"),
+			key.WithHelp("ctrl+l", "models"),
 		),
 		Suspend: key.NewBinding(
 			key.WithKeys("ctrl+z"),
