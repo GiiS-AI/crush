@@ -2852,8 +2852,10 @@ func (m *UI) generateLayout(w, h int) uiLayout {
 	editorHeight := m.textarea.Height() + editorHeightMargin
 	// The sidebar width
 	sidebarWidth := 30
-	// The header height
-	const landingHeaderHeight = 4
+	// The header height. The GiiS wordmark (internal/ui/logo/asciigiis.txt)
+	// is 5 lines tall, so this must be at least 5 or its bottom row gets
+	// clipped by the header/main split below.
+	const landingHeaderHeight = 5
 
 	var helpKeyMap help.KeyMap = m
 	if m.status != nil && m.status.ShowingAll() {
