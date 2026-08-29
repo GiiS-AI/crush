@@ -1,6 +1,7 @@
 package styles
 
 import (
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/exp/charmtone"
 )
 
@@ -32,7 +33,7 @@ func CharmtonePantera() Styles {
 
 		onPrimary: charmtone.Butter,
 
-		bgBase:         charmtone.Pepper,
+		bgBase:         lipgloss.Color("#0b0b14"),
 		bgLeastVisible: charmtone.BBQ,
 		bgLessVisible:  charmtone.Char,
 		bgMostVisible:  charmtone.Iron,

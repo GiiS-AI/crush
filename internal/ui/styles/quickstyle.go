@@ -127,7 +127,7 @@ func quickStyle(o quickStyleOpts) Styles {
 			CursorLine:       base,
 			CursorLineNumber: base.Foreground(o.fgMostSubtle),
 			Placeholder:      base.Foreground(o.fgMostSubtle),
-			Prompt:           base.Foreground(o.accent),
+			Prompt:           base.Foreground(lipgloss.Color("#6B50FF")),
 		},
 		Blurred: textarea.StyleState{
 			Base:             base,
@@ -715,7 +715,7 @@ func quickStyle(o quickStyleOpts) Styles {
 	s.Button.Blurred = lipgloss.NewStyle().Foreground(o.fgBase).Background(o.bgLessVisible)
 
 	// Editor
-	s.Editor.PromptNormalFocused = lipgloss.NewStyle().Foreground(o.successMostSubtle).SetString("::: ")
+	s.Editor.PromptNormalFocused = lipgloss.NewStyle().Foreground(lipgloss.Color("#6B50FF")).SetString("::: ")
 	s.Editor.PromptNormalBlurred = s.Editor.PromptNormalFocused.Foreground(o.fgMoreSubtle)
 	s.Editor.PromptYoloIconFocused = lipgloss.NewStyle().MarginRight(1).Foreground(o.fgMostSubtle).Background(o.busy).Bold(true).SetString(" Y ")
 	s.Editor.PromptYoloIconBlurred = s.Editor.PromptYoloIconFocused.Foreground(o.bgBase).Background(o.fgMoreSubtle)
@@ -758,7 +758,7 @@ func quickStyle(o quickStyleOpts) Styles {
 	s.Resource.OfflineIcon = lipgloss.NewStyle().Foreground(o.bgMostVisible).SetString("●")
 	s.Resource.BusyIcon = s.Resource.OfflineIcon.Foreground(o.busy)
 	s.Resource.ErrorIcon = s.Resource.OfflineIcon.Foreground(o.destructive)
-	s.Resource.OnlineIcon = s.Resource.OfflineIcon.Foreground(o.successMostSubtle)
+	s.Resource.OnlineIcon = s.Resource.OfflineIcon.Foreground(lipgloss.Color("#6B50FF"))
 	s.Resource.DisabledIcon = lipgloss.NewStyle().Foreground(o.fgMoreSubtle).SetString("●")
 	s.Resource.AdditionalText = lipgloss.NewStyle().Foreground(o.fgMostSubtle)
 	s.Resource.CapabilityCount = lipgloss.NewStyle().Foreground(o.fgMostSubtle)
