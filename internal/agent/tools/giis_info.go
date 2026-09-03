@@ -14,14 +14,14 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 )
 
-const CrushInfoToolName = "crush_info"
+const GiiSInfoToolName = "giis_info"
 
-//go:embed crush_info.md
-var crushInfoDescription string
+//go:embed giis_info.md
+var giisInfoDescription string
 
-type CrushInfoParams struct{}
+type GiiSInfoParams struct{}
 
-func NewCrushInfoTool(
+func NewGiiSInfoTool(
 	cfg *config.ConfigStore,
 	lspManager *lsp.Manager,
 	allSkills []*skills.Skill,
@@ -29,15 +29,15 @@ func NewCrushInfoTool(
 	skillTracker *skills.Tracker,
 ) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
-		CrushInfoToolName,
-		crushInfoDescription,
-		func(ctx context.Context, _ CrushInfoParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			return fantasy.NewTextResponse(buildCrushInfo(cfg, lspManager, allSkills, activeSkills, skillTracker)), nil
+		GiiSInfoToolName,
+		giisInfoDescription,
+		func(ctx context.Context, _ GiiSInfoParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
+			return fantasy.NewTextResponse(buildGiiSInfo(cfg, lspManager, allSkills, activeSkills, skillTracker)), nil
 		},
 	)
 }
 
-func buildCrushInfo(cfg *config.ConfigStore, lspManager *lsp.Manager, allSkills []*skills.Skill, activeSkills []*skills.Skill, skillTracker *skills.Tracker) string {
+func buildGiiSInfo(cfg *config.ConfigStore, lspManager *lsp.Manager, allSkills []*skills.Skill, activeSkills []*skills.Skill, skillTracker *skills.Tracker) string {
 	var b strings.Builder
 
 	writeConfigFiles(&b, cfg)

@@ -17,23 +17,23 @@ import (
 	"charm.land/fantasy"
 )
 
-const CrushLogsToolName = "crush_logs"
+const GiiSLogsToolName = "giis_logs"
 
-//go:embed crush_logs.md.tpl
-var crushLogsDescriptionTmpl []byte
+//go:embed giis_logs.md.tpl
+var giisLogsDescriptionTmpl []byte
 
-var crushLogsDescriptionTpl = template.Must(
-	template.New("crushLogsDescription").
-		Parse(string(crushLogsDescriptionTmpl)),
+var giisLogsDescriptionTpl = template.Must(
+	template.New("giisLogsDescription").
+		Parse(string(giisLogsDescriptionTmpl)),
 )
 
-type crushLogsDescriptionData struct {
+type giisLogsDescriptionData struct {
 	DefaultLines int
 	MaxLines     int
 }
 
-func crushLogsDescription() string {
-	return renderTemplate(crushLogsDescriptionTpl, crushLogsDescriptionData{
+func giisLogsDescription() string {
+	return renderTemplate(giisLogsDescriptionTpl, giisLogsDescriptionData{
 		DefaultLines: defaultLogLines,
 		MaxLines:     maxLogLines,
 	})
@@ -69,23 +69,23 @@ var sensitiveKeys = []string{
 	"credential",
 }
 
-type CrushLogsParams struct {
+type GiiSLogsParams struct {
 	Lines int `json:"lines,omitempty" description:"Number of recent log entries to return (default 50, max 100)"`
 }
 
-func NewCrushLogsTool(logFile string) fantasy.AgentTool {
+func NewGiiSLogsTool(logFile string) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
-		CrushLogsToolName,
-		crushLogsDescription(),
-		func(ctx context.Context, params CrushLogsParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			result := runCrushLogs(logFile, params)
+		GiiSLogsToolName,
+		giisLogsDescription(),
+		func(ctx context.Context, params GiiSLogsParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+			result := runGiiSLogs(logFile, params)
 			return fantasy.NewTextResponse(result), nil
 		},
 	)
 }
 
-// runCrushLogs reads and formats the last N log entries from the given file.
-func runCrushLogs(logFile string, params CrushLogsParams) string {
+// runGiiSLogs reads and formats the last N log entries from the given file.
+func runGiiSLogs(logFile string, params GiiSLogsParams) string {
 	// Validate and clamp the lines parameter.
 	lines := params.Lines
 	if lines <= 0 {

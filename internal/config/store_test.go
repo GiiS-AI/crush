@@ -393,8 +393,12 @@ func TestSetConfigField_AutoReloads(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "giis-code.json")
 
-	// Create initial config file with debug = false
-	initialConfig := `{"options": {"debug": false}}`
+	// Create initial config file with debug = false. disable_default_providers
+	// keeps this test from depending on a real network fetch of cloud/hyper
+	// providers — that fetch is a process-wide sync.Once, so whichever test
+	// happens to trigger it first (success or failure) would otherwise poison
+	// every other test in this package for the rest of the run.
+	initialConfig := `{"options": {"debug": false, "disable_default_providers": true}, "providers": {"test-provider": {"api_key": "test-key", "base_url": "https://example.com/v1", "models": [{"id": "test-model"}]}}}`
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config
@@ -428,8 +432,9 @@ func TestRemoveConfigField_AutoReloads(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "giis-code.json")
 
-	// Create initial config file with a custom option
-	initialConfig := `{"options": {"debug": true, "custom_field": "value"}}`
+	// Create initial config file with a custom option. See
+	// TestSetConfigField_AutoReloads for why disable_default_providers is set.
+	initialConfig := `{"options": {"debug": true, "custom_field": "value", "disable_default_providers": true}, "providers": {"test-provider": {"api_key": "test-key", "base_url": "https://example.com/v1", "models": [{"id": "test-model"}]}}}`
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config
@@ -486,11 +491,16 @@ func TestAutoReloadDisabledDuringReload(t *testing.T) {
 	configPath := filepath.Join(dir, "giis-code.json")
 
 	// Create initial config with a provider that will trigger config modification during reload
-	// (simulating the anthropic OAuth token removal case)
+	// (simulating the anthropic OAuth token removal case). disable_default_providers
+	// avoids the process-wide cloud/hyper provider sync.Once — see
+	// TestSetConfigField_AutoReloads for why that matters across the package.
 	initialConfig := `{
+		"options": {"disable_default_providers": true},
 		"providers": {
 			"anthropic": {
 				"api_key": "test-key",
+				"base_url": "https://api.anthropic.com/v1",
+				"models": [{"id": "claude-test-model"}],
 				"oauth": {"access_token": "token", "refresh_token": "refresh"}
 			}
 		}
@@ -508,7 +518,7 @@ func TestAutoReloadDisabledDuringReload(t *testing.T) {
 
 	// Modify file and reload — this should work without re-entrancy issues
 	time.Sleep(10 * time.Millisecond)
-	require.NoError(t, os.WriteFile(configPath, []byte(`{"options": {"debug": true}}`), 0o600))
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"options": {"debug": true, "disable_default_providers": true}, "providers": {"anthropic": {"api_key": "test-key", "base_url": "https://api.anthropic.com/v1", "models": [{"id": "claude-test-model"}]}}}`), 0o600))
 
 	err = store.ReloadFromDisk(context.Background())
 	require.NoError(t, err)
@@ -523,8 +533,9 @@ func TestSetConfigFields_AutoReloadsAtomically(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "giis-code.json")
 
-	// Create initial config file.
-	initialConfig := `{"options": {"debug": false}}`
+	// Create initial config file. See TestSetConfigField_AutoReloads for why
+	// disable_default_providers is set.
+	initialConfig := `{"options": {"debug": false, "disable_default_providers": true}, "providers": {"test-provider": {"api_key": "test-key", "base_url": "https://example.com/v1", "models": [{"id": "test-model"}]}}}`
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config.
