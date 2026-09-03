@@ -15,6 +15,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/GiiS-AI/GiiS-Code/internal/proto"
 	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 )
@@ -68,6 +69,25 @@ func wrapEvent(ev any) *pubsub.Payload {
 				ToolCallID: e.Payload.ToolCallID,
 				Granted:    e.Payload.Granted,
 				Denied:     e.Payload.Denied,
+			},
+		})
+	case pubsub.Event[question.Request]:
+		return envelope(pubsub.PayloadTypeQuestionRequest, pubsub.Event[proto.QuestionRequest]{
+			Type: e.Type,
+			Payload: proto.QuestionRequest{
+				ID:                 e.Payload.ID,
+				SessionID:          e.Payload.SessionID,
+				ToolCallID:         e.Payload.ToolCallID,
+				Questions:          questionsToProto(e.Payload.Questions),
+				ConfirmTitle:       e.Payload.ConfirmTitle,
+				ConfirmDescription: e.Payload.ConfirmDescription,
+			},
+		})
+	case pubsub.Event[question.Notification]:
+		return envelope(pubsub.PayloadTypeQuestionNotification, pubsub.Event[proto.QuestionNotification]{
+			Type: e.Type,
+			Payload: proto.QuestionNotification{
+				BatchID: e.Payload.BatchID,
 			},
 		})
 	case pubsub.Event[message.Message]:
@@ -167,6 +187,32 @@ func sessionToProto(s session.Session) proto.Session {
 		CreatedAt:        s.CreatedAt,
 		UpdatedAt:        s.UpdatedAt,
 	}
+}
+
+func questionsToProto(qs []question.Question) []proto.QuestionItem {
+	if len(qs) == 0 {
+		return nil
+	}
+	out := make([]proto.QuestionItem, len(qs))
+	for i, q := range qs {
+		choices := make([]proto.QuestionChoice, len(q.Choices))
+		for j, c := range q.Choices {
+			choices[j] = proto.QuestionChoice{
+				ID:          c.ID,
+				Label:       c.Label,
+				Description: c.Description,
+			}
+		}
+		out[i] = proto.QuestionItem{
+			ID:          q.ID,
+			Type:        string(q.Type),
+			Label:       q.Label,
+			Question:    q.Text,
+			Description: q.Description,
+			Choices:     choices,
+		}
+	}
+	return out
 }
 
 // isSessionBusy reports whether the given workspace has an in-flight

@@ -16,6 +16,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/config"
 	"github.com/GiiS-AI/GiiS-Code/internal/event"
 	"github.com/GiiS-AI/GiiS-Code/internal/format"
+	"github.com/GiiS-AI/GiiS-Code/internal/herdr"
 	"github.com/GiiS-AI/GiiS-Code/internal/proto"
 	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
@@ -255,6 +256,11 @@ func runNonInteractive(
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 
+	// Start herdr integration when running inside a herdr pane.
+	hc := herdr.Init()
+	hc.SetSessionID(sess.ID)
+	defer hc.Close()
+
 	stream := &runStream{
 		sessionID: sess.ID,
 		runID:     runID,
@@ -279,6 +285,11 @@ func runNonInteractive(
 			if !ok {
 				stopSpinner()
 				return nil
+			}
+
+			// Forward events to herdr if running inside a herdr pane.
+			if hev := herdr.Translate(ev); hev != nil {
+				hc.HandleEvent(hev)
 			}
 
 			done, err := stream.handle(ev, stopSpinner)

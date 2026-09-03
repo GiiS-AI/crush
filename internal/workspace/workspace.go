@@ -18,6 +18,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/oauth"
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/GiiS-AI/GiiS-Code/internal/proto"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 )
@@ -111,6 +112,10 @@ type Workspace interface {
 	PermissionDeny(perm permission.PermissionRequest) bool
 	PermissionSkipRequests() bool
 	PermissionSetSkipRequests(skip bool)
+
+	// Questions
+	QuestionAnswer(batchID string, responses []question.Answer) bool
+	QuestionCancel(batchID string) bool
 
 	// FileTracker
 	FileTrackerRecordRead(ctx context.Context, sessionID, path string)

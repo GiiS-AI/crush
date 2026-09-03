@@ -38,7 +38,7 @@ const (
 	// Name is the default name of this meta provider.
 	Name = "hyper"
 	// DisplayName is the display name of Hyper.
-	DisplayName = "Charm Hyper"
+	DisplayName = "c0d3r"
 	// defaultBaseURL is the default proxy URL.
 	defaultBaseURL = "https://hyper.charm.land"
 )

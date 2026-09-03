@@ -94,6 +94,10 @@ func NewShell(opts *Options) *Shell {
 		env = os.Environ()
 	}
 
+	// Strip herdr pane-ownership vars so subprocesses can't attach to or
+	// release the parent pane's agent authority.
+	env = withoutHerdrEnv(env)
+
 	// Allow tools to detect execution by GiiS-Code.
 	env = append(env, CrushEnvMarkers()...)
 

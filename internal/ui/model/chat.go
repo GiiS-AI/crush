@@ -421,6 +421,15 @@ func (m *Chat) ScrollToBottomAndAnimate() tea.Cmd {
 	return m.RestartPausedVisibleAnimations()
 }
 
+// ScrollToBottomAndSelectLast scrolls the chat view to the bottom, selects
+// the last item, and returns a command to restart any paused animations that
+// are now visible.
+func (m *Chat) ScrollToBottomAndSelectLast() tea.Cmd {
+	cmd := m.ScrollToBottomAndAnimate()
+	m.SelectLast()
+	return cmd
+}
+
 // ScrollByAndAnimate scrolls the chat view by the given number of line deltas and returns
 // a command to restart any paused animations that are now visible.
 func (m *Chat) ScrollByAndAnimate(lines int) tea.Cmd {

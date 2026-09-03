@@ -34,6 +34,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/oauth/copilot"
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 	giisskill "github.com/GiiS-AI/GiiS-Code/internal/skills/giis"
@@ -110,6 +111,7 @@ type coordinator struct {
 	sessions    session.Service
 	messages    message.Service
 	permissions permission.Service
+	questions   question.Service
 	history     history.Service
 	filetracker filetracker.Service
 	lspManager  *lsp.Manager
@@ -133,6 +135,7 @@ func NewCoordinator(
 	sessions session.Service,
 	messages message.Service,
 	permissions permission.Service,
+	questions question.Service,
 	history history.Service,
 	filetracker filetracker.Service,
 	lspManager *lsp.Manager,
@@ -158,6 +161,7 @@ func NewCoordinator(
 		sessions:     sessions,
 		messages:     messages,
 		permissions:  permissions,
+		questions:    questions,
 		history:      history,
 		filetracker:  filetracker,
 		lspManager:   lspManager,
@@ -638,6 +642,7 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 		tools.NewGlobTool(c.cfg.WorkingDir()),
 		tools.NewGrepTool(c.cfg.WorkingDir(), c.cfg.Config().Tools.Grep),
 		tools.NewLsTool(c.permissions, c.cfg.WorkingDir(), c.cfg.Config().Tools.Ls),
+		tools.NewQuestionTool(c.questions),
 		tools.NewSourcegraphTool(nil),
 		tools.NewTodosTool(c.sessions),
 		tools.NewViewTool(c.lspManager, c.permissions, c.filetracker, c.skillTracker, c.cfg.WorkingDir(), c.cfg.Config().Options.SkillsPaths...),
@@ -650,7 +655,17 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 
 	// Add LSP tools if user has configured LSPs or auto_lsp is enabled (nil or true).
 	if len(c.cfg.Config().LSP) > 0 || c.cfg.Config().Options.AutoLSP == nil || *c.cfg.Config().Options.AutoLSP {
-		allTools = append(allTools, tools.NewDiagnosticsTool(c.lspManager), tools.NewReferencesTool(c.lspManager), tools.NewLSPRestartTool(c.lspManager))
+		allTools = append(
+			allTools,
+			tools.NewDiagnosticsTool(c.lspManager),
+			tools.NewReferencesTool(c.lspManager),
+			tools.NewDefinitionTool(c.lspManager),
+			tools.NewSymbolsTool(c.lspManager),
+			tools.NewRenameTool(c.lspManager, c.permissions, c.history, c.filetracker),
+			tools.NewCallHierarchyTool(c.lspManager),
+			tools.NewReplaceSymbolTool(c.lspManager, c.permissions, c.history, c.filetracker),
+			tools.NewLSPRestartTool(c.lspManager),
+		)
 	}
 
 	if len(c.cfg.Config().MCP) > 0 {

@@ -56,7 +56,7 @@ func RefreshPrompts(ctx context.Context, name string) {
 
 	prompts, err := getPrompts(ctx, session)
 	if err != nil {
-		updateState(name, StateError, err, nil, Counts{})
+		updateState(name, StateError, err, session, Counts{})
 		return
 	}
 

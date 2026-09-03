@@ -20,6 +20,8 @@ const (
 	PayloadTypeMCPEvent               PayloadType = "mcp_event"
 	PayloadTypePermissionRequest      PayloadType = "permission_request"
 	PayloadTypePermissionNotification PayloadType = "permission_notification"
+	PayloadTypeQuestionRequest        PayloadType = "question_request"
+	PayloadTypeQuestionNotification   PayloadType = "question_notification"
 	PayloadTypeMessage                PayloadType = "message"
 	PayloadTypeSession                PayloadType = "session"
 	PayloadTypeFile                   PayloadType = "file"

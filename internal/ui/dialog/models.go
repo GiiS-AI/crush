@@ -275,7 +275,11 @@ func (m *Models) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	m.list.SetSize(listWidth, listHeight)
 
 	rc := NewRenderContext(t, width)
-	rc.Title = "Switch Model"
+	// Leading divider only — DialogTitle's own width-aware fill still
+	// supplies the trailing divider (same dense, unspaced "╱" repeat),
+	// so this can never overflow narrow terminals the way a fully
+	// hardcoded both-sides string could.
+	rc.Title = "╱╱╱╱╱╱╱╱╱ Switch Model"
 	rc.TitleInfo = m.modelTypeRadioView()
 
 	if m.isOnboarding {

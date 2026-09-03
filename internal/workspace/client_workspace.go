@@ -14,6 +14,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/agent/tools/mcp"
 	"github.com/GiiS-AI/GiiS-Code/internal/client"
 	"github.com/GiiS-AI/GiiS-Code/internal/config"
+	"github.com/GiiS-AI/GiiS-Code/internal/herdr"
 	"github.com/GiiS-AI/GiiS-Code/internal/history"
 	"github.com/GiiS-AI/GiiS-Code/internal/log"
 	"github.com/GiiS-AI/GiiS-Code/internal/lsp"
@@ -22,6 +23,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/GiiS-AI/GiiS-Code/internal/proto"
 	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
@@ -37,6 +39,10 @@ type ClientWorkspace struct {
 	mu     sync.RWMutex
 	ws     proto.Workspace
 	skills *skills.Manager
+
+	// herdrClient reports agent state to herdr when running inside a
+	// herdr-managed pane. Nil when not in a herdr environment.
+	herdrClient *herdr.Client
 }
 
 // NewClientWorkspace creates a new ClientWorkspace that proxies all
@@ -54,9 +60,10 @@ func NewClientWorkspace(c *client.Client, ws proto.Workspace) *ClientWorkspace {
 	states := protoToSkillStates(ws.Skills)
 	mgr := skills.NewManager(nil, nil, states, skills.WithGlobalMirror())
 	return &ClientWorkspace{
-		client: c,
-		ws:     ws,
-		skills: mgr,
+		client:      c,
+		ws:          ws,
+		skills:      mgr,
+		herdrClient: herdr.Init(),
 	}
 }
 
@@ -147,6 +154,7 @@ func (w *ClientWorkspace) ParseAgentToolSessionID(sessionID string) (string, str
 // are propagated to the caller; the TUI logs and ignores them since
 // the presence record is a hint, not correctness-critical state.
 func (w *ClientWorkspace) SetCurrentSession(ctx context.Context, sessionID string) error {
+	w.herdrClient.SetSessionID(sessionID)
 	return w.client.SetCurrentSession(ctx, w.workspaceID(), sessionID)
 }
 
@@ -332,6 +340,41 @@ func (w *ClientWorkspace) PermissionSkipRequests() bool {
 
 func (w *ClientWorkspace) PermissionSetSkipRequests(skip bool) {
 	_ = w.client.SetPermissionsSkipRequests(context.Background(), w.workspaceID(), skip)
+}
+
+// -- Questions --
+
+func (w *ClientWorkspace) QuestionAnswer(batchID string, responses []question.Answer) bool {
+	req := proto.QuestionAnswer{
+		BatchRequestID: batchID,
+		Responses:      make([]proto.QuestionResponse, len(responses)),
+	}
+	for i, r := range responses {
+		req.Responses[i] = proto.QuestionResponse{
+			QuestionID:  r.QuestionID,
+			SelectedIDs: r.SelectedIDs,
+			FillInText:  r.FillInText,
+			Yes:         r.Yes,
+			Notes:       r.Notes,
+		}
+	}
+	resolved, err := w.client.AnswerQuestionBatch(context.Background(), w.workspaceID(), req)
+	if err != nil {
+		slog.Error("Failed to answer question", "error", err)
+		return false
+	}
+	return resolved
+}
+
+func (w *ClientWorkspace) QuestionCancel(batchID string) bool {
+	cancelled, err := w.client.CancelQuestionBatch(context.Background(), w.workspaceID(), proto.QuestionCancel{
+		BatchRequestID: batchID,
+	})
+	if err != nil {
+		slog.Error("Failed to cancel question", "error", err)
+		return false
+	}
+	return cancelled
 }
 
 // -- FileTracker --
@@ -622,6 +665,11 @@ func (w *ClientWorkspace) Subscribe(program *tea.Program) {
 // are translated into domain types and forwarded to send.
 func (w *ClientWorkspace) consumeEvents(evc <-chan any, send func(tea.Msg)) {
 	for ev := range evc {
+		// Forward events to herdr if running inside a herdr pane.
+		if hev := herdr.Translate(ev); hev != nil {
+			w.herdrClient.HandleEvent(hev)
+		}
+
 		if _, ok := ev.(pubsub.Event[proto.ConfigChanged]); ok {
 			w.refreshWorkspace()
 			continue
@@ -634,6 +682,7 @@ func (w *ClientWorkspace) consumeEvents(evc <-chan any, send func(tea.Msg)) {
 }
 
 func (w *ClientWorkspace) Shutdown() {
+	w.herdrClient.Close()
 	_ = w.client.DeleteWorkspace(context.Background(), w.workspaceID())
 }
 
@@ -690,6 +739,25 @@ func (w *ClientWorkspace) translateEvent(ev any) tea.Msg {
 				ToolCallID: e.Payload.ToolCallID,
 				Granted:    e.Payload.Granted,
 				Denied:     e.Payload.Denied,
+			},
+		}
+	case pubsub.Event[proto.QuestionRequest]:
+		return pubsub.Event[question.Request]{
+			Type: e.Type,
+			Payload: question.Request{
+				ID:                 e.Payload.ID,
+				SessionID:          e.Payload.SessionID,
+				ToolCallID:         e.Payload.ToolCallID,
+				Questions:          protoQuestionsToDomain(e.Payload.Questions),
+				ConfirmTitle:       e.Payload.ConfirmTitle,
+				ConfirmDescription: e.Payload.ConfirmDescription,
+			},
+		}
+	case pubsub.Event[proto.QuestionNotification]:
+		return pubsub.Event[question.Notification]{
+			Type: e.Type,
+			Payload: question.Notification{
+				BatchID: e.Payload.BatchID,
 			},
 		}
 	case pubsub.Event[proto.Message]:
@@ -945,6 +1013,32 @@ func todosToProto(todos []session.Todo) []proto.Todo {
 			Content:    t.Content,
 			Status:     string(t.Status),
 			ActiveForm: t.ActiveForm,
+		}
+	}
+	return out
+}
+
+func protoQuestionsToDomain(qs []proto.QuestionItem) []question.Question {
+	if len(qs) == 0 {
+		return nil
+	}
+	out := make([]question.Question, len(qs))
+	for i, q := range qs {
+		choices := make([]question.Choice, len(q.Choices))
+		for j, c := range q.Choices {
+			choices[j] = question.Choice{
+				ID:          c.ID,
+				Label:       c.Label,
+				Description: c.Description,
+			}
+		}
+		out[i] = question.Question{
+			ID:          q.ID,
+			Type:        question.Type(q.Type),
+			Label:       q.Label,
+			Text:        q.Question,
+			Description: q.Description,
+			Choices:     choices,
 		}
 	}
 	return out

@@ -14,6 +14,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/GiiS-AI/GiiS-Code/internal/ui/diffview"
 	"github.com/alecthomas/chroma/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 )
 
 const (
@@ -116,8 +117,10 @@ type Styles struct {
 
 	// Buttons
 	Button struct {
-		Focused lipgloss.Style
-		Blurred lipgloss.Style
+		Focused  lipgloss.Style
+		Blurred  lipgloss.Style
+		Hovered  lipgloss.Style
+		Negative lipgloss.Style
 	}
 
 	// Editor
@@ -139,6 +142,22 @@ type Styles struct {
 		PromptBangIconBlurred lipgloss.Style
 		PromptBangDotsFocused lipgloss.Style
 		PromptBangDotsBlurred lipgloss.Style
+
+		// Question mode prompt (" ? ").
+		PromptQuestionIconFocused lipgloss.Style
+		PromptQuestionIconBlurred lipgloss.Style
+
+		// Question choice styling.
+		QuestionSelected   lipgloss.Style
+		QuestionUnselected lipgloss.Style
+		QuestionBody       lipgloss.Style
+		QuestionConfirm    lipgloss.Style
+		QuestionNote       lipgloss.Style
+		QuestionCursorBar  lipgloss.Style
+		QuestionRadioOn    lipgloss.Style
+		QuestionRadioOff   lipgloss.Style
+		QuestionCheckOn    lipgloss.Style
+		QuestionCheckOff   lipgloss.Style
 	}
 
 	// Radio
@@ -146,6 +165,15 @@ type Styles struct {
 		On    lipgloss.Style
 		Off   lipgloss.Style
 		Label lipgloss.Style // Text next to a radio button
+	}
+
+	Tab struct {
+		ActiveBorder          uv.Border
+		InactiveBorder        uv.Border
+		ActiveBorderBlurred   uv.Border
+		InactiveBorderBlurred uv.Border
+		ActiveStyle           uv.Style
+		InactiveStyle         uv.Style
 	}
 
 	// Background

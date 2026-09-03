@@ -25,6 +25,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// parseLevel converts an MCP logging level string to a slog.Level.
 func parseLevel(level mcp.LoggingLevel) slog.Level {
 	switch level {
 	case "info":
@@ -58,7 +59,52 @@ var (
 	broker   = pubsub.NewBroker[Event]()
 	initOnce sync.Once
 	initDone = make(chan struct{})
+
+	// initStarted records whether initialization was armed. WaitForInit only
+	// blocks once startup expects MCP initialization to run.
+	initMu      sync.Mutex
+	initStarted bool
+	initArmedAt time.Time
+
+	// renewMus serializes lazy session renewals per server so concurrent tool
+	// calls do not race to rebuild the same session.
+	renewMusMu sync.Mutex
+	renewMus   = map[string]*sync.Mutex{}
+
+	// gens tracks a per-server generation. teardown bumps it so in-flight
+	// initializations can detect they are stale before publishing results.
+	gens = csync.NewMap[string, uint64]()
+
+	// newSession is a test seam for renewal paths.
+	newSession = createSession
 )
+
+// ArmInit marks that MCP initialization is expected, so WaitForInit blocks
+// until it completes.
+func ArmInit() {
+	initMu.Lock()
+	initStarted = true
+	initArmedAt = time.Now()
+	initMu.Unlock()
+}
+
+// DisarmInit exists for tests that need to restore the unarmed state.
+func DisarmInit() {
+	initMu.Lock()
+	initStarted = false
+	initMu.Unlock()
+}
+
+func renewLock(name string) *sync.Mutex {
+	renewMusMu.Lock()
+	defer renewMusMu.Unlock()
+	if mu, ok := renewMus[name]; ok {
+		return mu
+	}
+	mu := &sync.Mutex{}
+	renewMus[name] = mu
+	return mu
+}
 
 // State represents the current state of an MCP client
 type State int
@@ -93,15 +139,17 @@ const (
 	EventToolsListChanged
 	EventPromptsListChanged
 	EventResourcesListChanged
+	EventChannelMessage
 )
 
 // Event represents an event in the MCP system
 type Event struct {
-	Type   EventType
-	Name   string
-	State  State
-	Error  error
-	Counts Counts
+	Type           EventType
+	Name           string
+	State          State
+	Error          error
+	Counts         Counts
+	ChannelMessage string
 }
 
 // Counts number of available tools, prompts, etc.
@@ -113,17 +161,39 @@ type Counts struct {
 
 // ClientInfo holds information about an MCP client's state
 type ClientInfo struct {
-	Name        string
-	State       State
-	Error       error
-	Client      *ClientSession
-	Counts      Counts
-	ConnectedAt time.Time
+	Name          string
+	State         State
+	Error         error
+	Client        *ClientSession
+	Counts        Counts
+	ConnectedAt   time.Time
+	Config        config.MCPConfig
+	PendingConfig *config.MCPConfig
 }
 
-// SubscribeEvents returns a channel for MCP events
+// SubscribeEvents returns a channel for MCP events.
+//
+// Channel message events are filtered out here. The MCP broker is process
+// global and those payloads do not yet carry workspace identity, so forwarding
+// them through the shared app event stream would create a cross-workspace
+// injection path.
 func SubscribeEvents(ctx context.Context) <-chan pubsub.Event[Event] {
-	return broker.Subscribe(ctx)
+	raw := broker.Subscribe(ctx)
+	filtered := make(chan pubsub.Event[Event], 64)
+	go func() {
+		defer close(filtered)
+		for ev := range raw {
+			if ev.Payload.Type == EventChannelMessage {
+				continue
+			}
+			select {
+			case filtered <- ev:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return filtered
 }
 
 // GetStates returns the current state of all MCP clients
@@ -164,6 +234,8 @@ func Close(ctx context.Context) error {
 
 // Initialize initializes MCP clients based on the provided configuration.
 func Initialize(ctx context.Context, permissions permission.Service, cfg *config.ConfigStore) {
+	_ = permissions
+	ArmInit()
 	slog.Info("Initializing MCP clients")
 	var wg sync.WaitGroup
 	// Initialize states for all configured MCPs
@@ -176,42 +248,52 @@ func Initialize(ctx context.Context, permissions permission.Service, cfg *config
 
 		// Set initial starting state
 		wg.Add(1)
-		go func(name string, m config.MCPConfig) {
-			defer func() {
-				wg.Done()
-				if r := recover(); r != nil {
-					var err error
-					switch v := r.(type) {
-					case error:
-						err = v
-					case string:
-						err = fmt.Errorf("panic: %s", v)
-					default:
-						err = fmt.Errorf("panic: %v", v)
-					}
-					updateState(name, StateError, err, nil, Counts{})
-					slog.Error("Panic in MCP client initialization", "error", err, "name", name)
-				}
-			}()
-
-			if err := initClient(ctx, cfg, name, m, cfg.Resolver()); err != nil {
-				slog.Debug("Failed to initialize MCP client", "name", name, "error", err)
-			}
-		}(name, m)
+		goInitClient(ctx, cfg, name, m, &wg)
 	}
 	wg.Wait()
 	initOnce.Do(func() { close(initDone) })
 }
 
 // WaitForInit blocks until MCP initialization is complete.
-// If Initialize was never called, this returns immediately.
 func WaitForInit(ctx context.Context) error {
+	initMu.Lock()
+	started := initStarted
+	initMu.Unlock()
+	if !started {
+		return nil
+	}
 	select {
 	case <-initDone:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// InitWaitBudget bounds how long a caller waits for MCP startup before
+// proceeding with whichever servers have registered so far.
+const InitWaitBudget = 10 * time.Second
+
+// WaitForInitBudget behaves like WaitForInit, but only until the budget
+// measured from ArmInit elapses.
+func WaitForInitBudget(ctx context.Context, budget time.Duration) error {
+	initMu.Lock()
+	started := initStarted
+	armedAt := initArmedAt
+	initMu.Unlock()
+	if !started {
+		return nil
+	}
+	waitCtx, cancel := context.WithDeadline(ctx, armedAt.Add(budget))
+	defer cancel()
+	if err := WaitForInit(waitCtx); err == nil {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	slog.Warn("MCP initialization still pending after wait budget; continuing without unfinished servers", "budget", budget)
+	return nil
 }
 
 // InitializeSingle initializes a single MCP client by name.
@@ -227,13 +309,13 @@ func InitializeSingle(ctx context.Context, name string, cfg *config.ConfigStore)
 		return nil
 	}
 
-	return initClient(ctx, cfg, name, m, cfg.Resolver())
+	return initClient(ctx, cfg, name, m, currentGen(name), cfg.Resolver())
 }
 
 // initClient initializes a single MCP client with the given configuration.
-func initClient(ctx context.Context, cfg *config.ConfigStore, name string, m config.MCPConfig, resolver config.VariableResolver) error {
+func initClient(ctx context.Context, cfg *config.ConfigStore, name string, m config.MCPConfig, gen uint64, resolver config.VariableResolver) error {
 	// Set initial starting state.
-	updateState(name, StateStarting, nil, nil, Counts{})
+	updateState(name, StateStarting, nil, nil, Counts{}, withPending(m))
 
 	// createSession handles its own timeout internally.
 	session, err := createSession(ctx, name, m, resolver)
@@ -241,100 +323,232 @@ func initClient(ctx context.Context, cfg *config.ConfigStore, name string, m con
 		return err
 	}
 
-	tools, err := getTools(ctx, session)
+	if currentGen(name) != gen {
+		closeSession(name, session)
+		return context.Canceled
+	}
+
+	var counts Counts
+	counts.Tools, err = registerSessionTools(ctx, cfg, name, session)
 	if err != nil {
 		slog.Error("Error listing tools", "error", err)
-		updateState(name, StateError, err, nil, Counts{})
-		session.Close()
+		updateState(name, StateError, err, session, Counts{})
 		return err
 	}
 
 	prompts, err := getPrompts(ctx, session)
 	if err != nil {
 		slog.Error("Error listing prompts", "error", err)
-		updateState(name, StateError, err, nil, Counts{})
-		session.Close()
+		updateState(name, StateError, err, session, Counts{})
 		return err
 	}
-
-	toolCount := updateTools(cfg, name, tools)
 	updatePrompts(name, prompts)
-	sessions.Set(name, session)
+	counts.Prompts = len(prompts)
 
-	updateState(name, StateConnected, nil, session, Counts{
-		Tools:   toolCount,
-		Prompts: len(prompts),
-	})
+	resources, err := getResources(ctx, session)
+	if err != nil {
+		slog.Error("Error listing resources", "error", err)
+		updateState(name, StateError, err, session, Counts{})
+		return err
+	}
+	counts.Resources = updateResources(name, resources)
+
+	if currentGen(name) != gen {
+		closeSession(name, session)
+		return context.Canceled
+	}
+
+	sessions.Set(name, session)
+	updateState(name, StateConnected, nil, session, counts, withConfig(m))
 
 	return nil
 }
 
 // DisableSingle disables and closes a single MCP client by name.
 func DisableSingle(cfg *config.ConfigStore, name string) error {
-	session, ok := sessions.Get(name)
-	if ok {
-		if err := session.Close(); err != nil &&
-			!errors.Is(err, io.EOF) &&
-			!errors.Is(err, context.Canceled) &&
-			err.Error() != "signal: killed" {
-			slog.Warn("Error closing MCP session", "name", name, "error", err)
-		}
-		sessions.Del(name)
-	}
-
-	// Clear tools and prompts for this MCP.
-	updateTools(cfg, name, nil)
-	updatePrompts(name, nil)
-
-	// Update state to disabled.
+	_ = cfg
+	teardown(name)
 	updateState(name, StateDisabled, nil, nil, Counts{})
-
 	slog.Info("Disabled mcp client", "name", name)
 	return nil
 }
 
+func goInitClient(ctx context.Context, cfg *config.ConfigStore, name string, m config.MCPConfig, wg *sync.WaitGroup) {
+	gen := currentGen(name)
+	go func() {
+		if wg != nil {
+			defer wg.Done()
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				var err error
+				switch v := r.(type) {
+				case error:
+					err = v
+				case string:
+					err = fmt.Errorf("panic: %s", v)
+				default:
+					err = fmt.Errorf("panic: %v", v)
+				}
+				updateState(name, StateError, err, nil, Counts{})
+				slog.Error("Panic in MCP client initialization", "error", err, "name", name)
+			}
+		}()
+		if err := initClient(ctx, cfg, name, m, gen, cfg.Resolver()); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Debug("Failed to initialize MCP client", "name", name, "error", err)
+		}
+	}()
+}
+
+func currentGen(name string) uint64 {
+	gen, _ := gens.Get(name)
+	return gen
+}
+
+func teardown(name string) {
+	gen := currentGen(name)
+	gens.Set(name, gen+1)
+	if session, ok := sessions.Take(name); ok {
+		closeSession(name, session)
+	}
+	clearMCPData(name)
+}
+
 func getOrRenewClient(ctx context.Context, cfg *config.ConfigStore, name string) (*ClientSession, error) {
+	m := cfg.Config().MCP[name]
+	timeout := mcpTimeout(m)
+
+	if sess, ok := sessions.Get(name); ok {
+		if err := pingSession(ctx, sess, timeout); err == nil {
+			return sess, nil
+		}
+	}
+
+	mu := renewLock(name)
+	mu.Lock()
+	defer mu.Unlock()
+
 	sess, ok := sessions.Get(name)
 	if !ok {
 		return nil, fmt.Errorf("mcp '%s' not available", name)
 	}
 
-	m := cfg.Config().MCP[name]
-	state, _ := states.Get(name)
-
-	timeout := mcpTimeout(m)
-	pingCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	err := sess.Ping(pingCtx, nil)
-	if err == nil {
+	pingErr := pingSession(ctx, sess, timeout)
+	if pingErr == nil {
 		return sess, nil
 	}
-	updateState(name, StateError, maybeTimeoutErr(err, timeout), nil, state.Counts)
 
-	sess, err = createSession(ctx, name, m, cfg.Resolver())
+	state, _ := states.Get(name)
+	updateState(name, StateError, maybeTimeoutErr(pingErr, timeout), sess, state.Counts)
+
+	gen := currentGen(name)
+	newSess, err := newSession(ctx, name, m, cfg.Resolver())
 	if err != nil {
+		clearMCPData(name)
 		return nil, err
 	}
 
-	updateState(name, StateConnected, nil, sess, state.Counts)
-	sessions.Set(name, sess)
-	return sess, nil
+	if currentGen(name) != gen {
+		closeSession(name, newSess)
+		return nil, context.Canceled
+	}
+
+	var counts Counts
+	counts.Tools, err = registerSessionTools(ctx, cfg, name, newSess)
+	if err != nil {
+		updateState(name, StateError, err, newSess, Counts{})
+		return nil, err
+	}
+
+	prompts, err := getPrompts(ctx, newSess)
+	if err != nil {
+		updateState(name, StateError, err, newSess, Counts{})
+		return nil, err
+	}
+	updatePrompts(name, prompts)
+	counts.Prompts = len(prompts)
+
+	resources, err := getResources(ctx, newSess)
+	if err != nil {
+		updateState(name, StateError, err, newSess, Counts{})
+		return nil, err
+	}
+	counts.Resources = updateResources(name, resources)
+
+	if currentGen(name) != gen {
+		closeSession(name, newSess)
+		return nil, context.Canceled
+	}
+
+	sessions.Set(name, newSess)
+	updateState(name, StateConnected, nil, newSess, counts, withConfig(m))
+	return newSess, nil
 }
 
-// updateState updates the state of an MCP client and publishes an event
-func updateState(name string, state State, err error, client *ClientSession, counts Counts) {
-	info := ClientInfo{
-		Name:   name,
-		State:  state,
-		Error:  err,
-		Client: client,
-		Counts: counts,
+func pingSession(ctx context.Context, session *ClientSession, timeout time.Duration) error {
+	pingCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return session.Ping(pingCtx, nil)
+}
+
+func closeSession(name string, session *ClientSession) {
+	if err := session.Close(); err != nil &&
+		!errors.Is(err, io.EOF) &&
+		!errors.Is(err, context.Canceled) &&
+		err.Error() != "signal: killed" {
+		slog.Warn("Error closing MCP session", "name", name, "error", err)
+	}
+}
+
+type stateOpt func(*ClientInfo)
+
+func withConfig(m config.MCPConfig) stateOpt {
+	return func(info *ClientInfo) {
+		info.Config = m
+		info.PendingConfig = nil
+	}
+}
+
+func withPending(m config.MCPConfig) stateOpt {
+	return func(info *ClientInfo) {
+		mc := m
+		info.PendingConfig = &mc
+	}
+}
+
+// updateState updates the state of an MCP client and publishes an event.
+func updateState(name string, state State, err error, client *ClientSession, counts Counts, opts ...stateOpt) {
+	prev, _ := states.Get(name)
+	info := prev
+	info.Name = name
+	info.State = state
+	info.Error = err
+	info.Client = client
+	info.Counts = counts
+	for _, opt := range opts {
+		opt(&info)
 	}
 	switch state {
 	case StateConnected:
 		info.ConnectedAt = time.Now()
+	case StateDisabled:
+		info.Config = config.MCPConfig{}
+		info.PendingConfig = nil
 	case StateError:
-		sessions.Del(name)
+		switch {
+		case client != nil:
+			if cur, ok := sessions.Get(name); ok && cur == client {
+				sessions.Del(name)
+				clearMCPData(name)
+			}
+			closeSession(name, client)
+		default:
+			if old, ok := sessions.Take(name); ok {
+				closeSession(name, old)
+			}
+			clearMCPData(name)
+		}
+		info.Client = nil
 	}
 	states.Set(name, info)
 
@@ -361,6 +575,9 @@ func createSession(ctx context.Context, name string, m config.MCPConfig, resolve
 		cancelTimer.Stop()
 		return nil, err
 	}
+
+	channelGate := newChannelGate()
+	transport = &channelTransport{inner: transport, name: name, gate: channelGate}
 
 	client := mcp.NewClient(
 		&mcp.Implementation{
@@ -406,7 +623,22 @@ func createSession(ctx context.Context, name string, m config.MCPConfig, resolve
 
 	cancelTimer.Stop()
 	slog.Debug("MCP client initialized", "name", name)
+	channelGate.resolve(false)
 	return &ClientSession{session, cancel}, nil
+}
+
+type transportWrapper interface {
+	unwrapTransport() mcp.Transport
+}
+
+func unwrapTransport(transport mcp.Transport) mcp.Transport {
+	for {
+		wrapped, ok := transport.(transportWrapper)
+		if !ok {
+			return transport
+		}
+		transport = wrapped.unwrapTransport()
+	}
 }
 
 // maybeStdioErr if a stdio mcp prints an error in non-json format, it'll fail
@@ -420,6 +652,7 @@ func maybeStdioErr(err error, transport mcp.Transport) error {
 	if !errors.Is(err, io.EOF) {
 		return err
 	}
+	transport = unwrapTransport(transport)
 	ct, ok := transport.(*mcp.CommandTransport)
 	if !ok {
 		return err
@@ -456,6 +689,7 @@ func createTransport(ctx context.Context, m config.MCPConfig, resolver config.Va
 			return nil, err
 		}
 		cmd := exec.CommandContext(ctx, home.Long(command), args...)
+		configureStdioProcess(cmd)
 		cmd.Env = append(os.Environ(), envs...)
 		return &mcp.CommandTransport{
 			Command: cmd,
@@ -525,11 +759,21 @@ func mcpTimeout(m config.MCPConfig) time.Duration {
 func stdioCheck(old *exec.Cmd) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, old.Path, old.Args...)
+	args := old.Args
+	if len(args) > 0 {
+		args = args[1:]
+	}
+	cmd := exec.CommandContext(ctx, old.Path, args...)
 	cmd.Env = old.Env
 	out, err := cmd.CombinedOutput()
 	if err == nil || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil
 	}
 	return fmt.Errorf("%w: %s", err, string(out))
+}
+
+func clearMCPData(name string) {
+	allTools.Del(name)
+	allPrompts.Del(name)
+	allResources.Del(name)
 }

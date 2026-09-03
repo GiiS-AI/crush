@@ -27,12 +27,14 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/event"
 	"github.com/GiiS-AI/GiiS-Code/internal/filetracker"
 	"github.com/GiiS-AI/GiiS-Code/internal/format"
+	"github.com/GiiS-AI/GiiS-Code/internal/herdr"
 	"github.com/GiiS-AI/GiiS-Code/internal/history"
 	"github.com/GiiS-AI/GiiS-Code/internal/log"
 	"github.com/GiiS-AI/GiiS-Code/internal/lsp"
 	"github.com/GiiS-AI/GiiS-Code/internal/message"
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/shell"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
@@ -57,6 +59,7 @@ type App struct {
 	Messages    message.Service
 	History     history.Service
 	Permissions permission.Service
+	Questions   question.Service
 	FileTracker filetracker.Service
 
 	AgentCoordinator agent.Coordinator
@@ -83,6 +86,10 @@ type App struct {
 	// drive their exit on a deterministic, payload-bearing event
 	// instead of guessing from message finish parts.
 	runCompletions *pubsub.Broker[notify.RunComplete]
+
+	// herdrClient reports agent state to herdr when running inside a
+	// herdr-managed pane. Nil when not in a herdr environment.
+	herdrClient *herdr.Client
 }
 
 // New initializes a new application instance. skillsMgr carries the
@@ -106,6 +113,7 @@ func New(ctx context.Context, conn *sql.DB, store *config.ConfigStore, skillsMgr
 		Messages:    messages,
 		History:     files,
 		Permissions: permission.NewPermissionService(store.WorkingDir(), skipPermissionsRequests, allowedTools),
+		Questions:   question.NewService(),
 		FileTracker: filetracker.NewService(q),
 		LSPManager:  lsp.NewManager(store),
 		Skills:      skillsMgr,
@@ -132,7 +140,19 @@ func New(ctx context.Context, conn *sql.DB, store *config.ConfigStore, skillsMgr
 	// Check for updates in the background.
 	go app.checkForUpdates(ctx)
 
+	// Arm initialization before launching the goroutine so WaitForInit sees the
+	// pending startup work even if it races this goroutine.
+	mcp.ArmInit()
 	go mcp.Initialize(ctx, app.Permissions, store)
+
+	// Start herdr integration when running inside a herdr pane.
+	app.herdrClient = herdr.Init()
+	herdr.BridgeLocal(ctx, app.herdrClient, herdr.BridgeSources{
+		PermRequests:      app.Permissions,
+		PermNotifications: app.Permissions,
+		RunCompletions:    app.runCompletions,
+		Messages:          app.Messages,
+	})
 
 	// Release the shared database connection on shutdown. The pool
 	// closes the underlying *sql.DB when the last reference is released.
@@ -198,6 +218,13 @@ func (app *App) AgentNotifications() *pubsub.Broker[notify.Notification] {
 // coordinator could publish one of its own.
 func (app *App) RunCompletions() *pubsub.Broker[notify.RunComplete] {
 	return app.runCompletions
+}
+
+// ReportCurrentSession tells herdr which session the user is now viewing so
+// it can persist a resumable reference for the pane. Safe to call when not
+// running inside a herdr pane; the underlying client is nil-safe.
+func (app *App) ReportCurrentSession(sessionID string) {
+	app.herdrClient.SetSessionID(sessionID)
 }
 
 // resolveSession resolves which session to use for a non-interactive run
@@ -315,6 +342,9 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 	// Automatically approve all permission requests for this non-interactive
 	// session.
 	app.Permissions.AutoApproveSession(sess.ID)
+
+	// Report session identity to herdr.
+	app.ReportCurrentSession(sess.ID)
 
 	type response struct {
 		result *fantasy.AgentResult
@@ -506,6 +536,8 @@ func (app *App) setupEvents() {
 	setupSubscriber(ctx, app.serviceEventsWG, "messages", app.Messages.Subscribe, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "permissions", app.Permissions.Subscribe, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "permissions-notifications", app.Permissions.SubscribeNotifications, app.events)
+	setupSubscriber(ctx, app.serviceEventsWG, "questions", app.Questions.Subscribe, app.events)
+	setupSubscriber(ctx, app.serviceEventsWG, "question-notifications", app.Questions.SubscribeNotifications, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "history", app.History.Subscribe, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "agent-notifications", app.agentNotifications.Subscribe, app.events)
 	setupSubscriberMustDeliver(ctx, app.serviceEventsWG, "run-completions", app.runCompletions.Subscribe, app.events)
@@ -592,6 +624,7 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		app.Sessions,
 		app.Messages,
 		app.Permissions,
+		app.Questions,
 		app.History,
 		app.FileTracker,
 		app.LSPManager,
@@ -676,6 +709,9 @@ func (app *App) Shutdown() {
 	wg.Go(func() {
 		shell.GetBackgroundShellManager().KillAll(shutdownCtx)
 	})
+
+	// Close herdr client to stop its background writer.
+	app.herdrClient.Close()
 
 	// Shutdown all LSP clients.
 	wg.Go(func() {

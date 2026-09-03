@@ -184,6 +184,7 @@ func RunAndCapturePTY(ctx context.Context, opts RunOptions) (CaptureResult, erro
 // GiiS-Code handler stack. Shared by the stateless [Run] entrypoint and the
 // stateful [Shell] so the two surfaces cannot drift.
 func newRunner(cwd string, env []string, stdin io.Reader, stdout, stderr io.Writer, blockFuncs []BlockFunc) (*interp.Runner, error) {
+	env = withoutHerdrEnv(env)
 	env = withNonInteractiveEnv(env)
 	return interp.New(
 		interp.StdIO(stdin, stdout, stderr),
@@ -251,6 +252,34 @@ func withNonInteractiveEnv(env []string) []string {
 	}
 
 	return append(result, nonInteractiveEnvVars...)
+}
+
+// herdrEnvVars are the environment variables herdr injects into panes so
+// agents can report state over its Unix socket API. Subprocesses must not
+// inherit these: a child process that calls herdr.Init() would attach to the
+// parent's pane and, on exit, release its agent authority.
+var herdrEnvVars = []string{
+	"HERDR_ENV",
+	"HERDR_SOCKET_PATH",
+	"HERDR_PANE_ID",
+}
+
+// withoutHerdrEnv returns env with all HERDR_* variables removed. The
+// returned slice is a new allocation safe to use concurrently with the
+// input.
+func withoutHerdrEnv(env []string) []string {
+	strip := make(map[string]bool, len(herdrEnvVars))
+	for _, k := range herdrEnvVars {
+		strip[k] = true
+	}
+	result := make([]string, 0, len(env))
+	for _, e := range env {
+		if key, _, ok := strings.Cut(e, "="); ok && strip[key] {
+			continue
+		}
+		result = append(result, e)
+	}
+	return result
 }
 
 // standardHandlers returns the exec-handler middleware chain used by both

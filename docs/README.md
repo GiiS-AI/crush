@@ -15,28 +15,30 @@ The binary `c0d3r` is a rebranded version of [Crush](https://github.com/charmbra
 
 ## Installation
 
-### From Binary
-
-The binary is pre-built and located in the project root:
+### Hosted Installer
 
 ```bash
-# Copy to PATH
-sudo cp ./c0d3r /usr/local/bin/
-chmod +x /usr/local/bin/c0d3r
+curl -fsSL https://giis.ai/install.sh | sh
+```
 
-# Or run directly
+This installs `c0d3r` to `~/.local/bin` and the runtime bundle to `~/.local/share/c0d3r`.
+
+### Local Repository Launcher
+
+If you are working from this repository directly, launch the local wrapper from the repo root:
+
+```bash
 ./c0d3r
 ```
 
 ### From Source
 
-Requires Go 1.21+:
+Requires Go 1.26.4+:
 
 ```bash
 go build .
 ./c0d3r
 ```
-
 ## Quick Start
 
 Just run it:
@@ -45,7 +47,7 @@ Just run it:
 ./c0d3r
 ```
 
-The first time you run it, the launcher script (`giis-code-launch.sh`) automatically:
+The first time you run it, the `c0d3r` launcher automatically:
 1. Starts the bridge service on `http://127.0.0.1:8787`
 2. Starts the shim service on `http://127.0.0.1:8765`
 3. Launches the interactive UI
@@ -318,24 +320,26 @@ c0d3r logs --tail 500
 
 ## The Launcher Script
 
-The `giis-code-launch.sh` script is your entry point. It:
+The `c0d3r` launcher is your entry point. When you run `./c0d3r` from the repo or `c0d3r` after installation, it:
 
 1. Checks if bridge is running (health endpoint at :8787/health)
 2. Starts bridge in background if needed
 3. Checks if shim is running (models endpoint at :8765/v1/models)
 4. Starts shim in background if needed
-5. Launches the c0d3r TUI with all arguments
+5. Launches the GiiS-c0d3r TUI with all arguments
 
 ```bash
-# Run directly
-bash giis-code-launch.sh
+# Local repository launcher
+./c0d3r
+
+# Installed launcher on PATH
+c0d3r
 
 # Pass arguments through
-bash giis-code-launch.sh run "Fix this bug"
-bash giis-code-launch.sh --debug
-bash giis-code-launch.sh --continue
+./c0d3r run "Fix this bug"
+./c0d3r --debug
+./c0d3r --continue
 ```
-
 ## The Shim (giis-shim.py)
 
 The Python shim is an OpenAI-compatible HTTP API server that wraps local `claude` and `codex` CLI commands. See [SHIM.md](./SHIM.md) for technical details.
@@ -470,9 +474,8 @@ pkill -f "giis-shim.py"
 ```
 
 Then try again:
-
 ```bash
-bash giis-code-launch.sh
+./c0d3r
 ```
 
 ### Claude or Codex CLI Not Found
@@ -586,7 +589,7 @@ For issues or questions:
 
 ## Next Steps
 
-1. **Get started**: Run `c0d3r` or `bash giis-code-launch.sh`
+1. **Get started**: Run `./c0d3r` locally or `c0d3r` after installation
 2. **Configure**: Create `.giis-code.json` or `.agents.md` in your project
 3. **Add LSPs**: Configure language servers for code intelligence
 4. **Extend**: Build custom skills or use MCP servers

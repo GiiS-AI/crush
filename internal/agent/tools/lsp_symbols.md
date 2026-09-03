@@ -1,0 +1,1 @@
+List document symbols for a file via LSP. Returns a structured outline showing symbol names, kinds, and line numbers. Use this before editing unfamiliar files to understand structure, or to find the exact symbol name for `lsp_replace_symbol`.

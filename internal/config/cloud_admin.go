@@ -193,6 +193,13 @@ func (c *realCloudSessionClient) CreateToken(ctx context.Context, name string, e
 		return cloudCreatedPATResponse{}, err
 	}
 	r.Header.Set("Content-Type", "application/json")
+	// The preceding Login call leaves an auth cookie in the shared cookie
+	// jar, so this POST is subject to the backend's CSRF origin check
+	// (CsrfProtectionMiddleware) same as a browser request would be. A bare
+	// Go http.Client never sets Origin/Referer on its own, so without this
+	// the request gets rejected with 403 "Cross-site request blocked" even
+	// though the login itself succeeded.
+	r.Header.Set("Origin", c.baseURL)
 	resp, err := c.http.Do(r)
 	if err != nil {
 		return cloudCreatedPATResponse{}, err

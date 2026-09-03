@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -91,6 +92,65 @@ func TestRun_Cwd(t *testing.T) {
 	got := strings.TrimRight(stdout.String(), "\n")
 	if !strings.HasSuffix(got, dir) && !strings.HasSuffix(dir, got) {
 		t.Fatalf("pwd = %q, want it to match %q", got, dir)
+	}
+}
+
+func TestWithoutHerdrEnv(t *testing.T) {
+	t.Parallel()
+
+	env := []string{
+		"PATH=/usr/bin",
+		"HERDR_ENV=1",
+		"HERDR_SOCKET_PATH=/tmp/herdr.sock",
+		"HERDR_PANE_ID=pane-1",
+		"HOME=/tmp/home",
+	}
+
+	got := withoutHerdrEnv(env)
+	if slices.Contains(got, "HERDR_ENV=1") {
+		t.Fatal("HERDR_ENV should be removed")
+	}
+	if slices.Contains(got, "HERDR_SOCKET_PATH=/tmp/herdr.sock") {
+		t.Fatal("HERDR_SOCKET_PATH should be removed")
+	}
+	if slices.Contains(got, "HERDR_PANE_ID=pane-1") {
+		t.Fatal("HERDR_PANE_ID should be removed")
+	}
+	if !slices.Contains(got, "PATH=/usr/bin") {
+		t.Fatal("PATH should be preserved")
+	}
+	if !slices.Contains(got, "HOME=/tmp/home") {
+		t.Fatal("HOME should be preserved")
+	}
+	if slices.Contains(env, "HERDR_ENV=1") == false {
+		t.Fatal("input env must remain unchanged")
+	}
+}
+
+func TestRun_StripsHerdrEnvFromSubprocess(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	env := append(os.Environ(),
+		"HERDR_ENV=1",
+		"HERDR_SOCKET_PATH=/tmp/herdr.sock",
+		"HERDR_PANE_ID=pane-1",
+	)
+	err := Run(t.Context(), RunOptions{
+		Command: "env",
+		Cwd:     t.TempDir(),
+		Env:     env,
+		Stdout:  &stdout,
+	})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	output := stdout.String()
+	for _, forbidden := range []string{"HERDR_ENV=", "HERDR_SOCKET_PATH=", "HERDR_PANE_ID="} {
+		if strings.Contains(output, forbidden) {
+			t.Fatalf("subprocess inherited %s in env output:\n%s", forbidden, output)
+		}
 	}
 }
 

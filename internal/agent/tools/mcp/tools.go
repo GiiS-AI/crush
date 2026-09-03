@@ -119,7 +119,7 @@ func RefreshTools(ctx context.Context, cfg *config.ConfigStore, name string) {
 
 	tools, err := getTools(ctx, session)
 	if err != nil {
-		updateState(name, StateError, err, nil, Counts{})
+		updateState(name, StateError, err, session, Counts{})
 		return
 	}
 
@@ -128,6 +128,14 @@ func RefreshTools(ctx context.Context, cfg *config.ConfigStore, name string) {
 	prev, _ := states.Get(name)
 	prev.Counts.Tools = toolCount
 	updateState(name, StateConnected, nil, session, prev.Counts)
+}
+
+func registerSessionTools(ctx context.Context, cfg *config.ConfigStore, name string, session *ClientSession) (int, error) {
+	tools, err := getTools(ctx, session)
+	if err != nil {
+		return 0, err
+	}
+	return updateTools(cfg, name, tools), nil
 }
 
 func getTools(ctx context.Context, session *ClientSession) ([]*Tool, error) {

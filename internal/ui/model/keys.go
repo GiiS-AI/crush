@@ -21,6 +21,21 @@ type KeyMap struct {
 		// History navigation
 		HistoryPrev key.Binding
 		HistoryNext key.Binding
+
+		// CopySelection copies the current textarea selection to the
+		// clipboard.
+		CopySelection key.Binding
+
+		// CutSelection copies the current textarea selection to the
+		// clipboard and deletes it from the textarea.
+		CutSelection key.Binding
+
+		// SelectAll selects all text in the textarea.
+		SelectAll key.Binding
+
+		// PasteText pastes clipboard text into the textarea, as an
+		// alternative to bracketed paste.
+		PasteText key.Binding
 	}
 
 	Chat struct {
@@ -49,6 +64,9 @@ type KeyMap struct {
 		Expand         key.Binding
 		ScrollLeft     key.Binding
 		ScrollRight    key.Binding
+		EndFollow      key.Binding
+		FocusSidebar   key.Binding
+		FocusChat      key.Binding
 	}
 
 	Initialize struct {
@@ -59,14 +77,15 @@ type KeyMap struct {
 	}
 
 	// Global key maps
-	Quit       key.Binding
-	Help       key.Binding
-	Commands   key.Binding
-	Models     key.Binding
-	Suspend    key.Binding
-	Sessions   key.Binding
-	Tab        key.Binding
-	ToggleYolo key.Binding
+	Quit        key.Binding
+	Help        key.Binding
+	Commands    key.Binding
+	Models      key.Binding
+	ProviderCLI key.Binding
+	Suspend     key.Binding
+	Sessions    key.Binding
+	Tab         key.Binding
+	ToggleYolo  key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
@@ -86,6 +105,10 @@ func DefaultKeyMap() KeyMap {
 		Models: key.NewBinding(
 			key.WithKeys("ctrl+m", "ctrl+l"),
 			key.WithHelp("ctrl+l", "models"),
+		),
+		ProviderCLI: key.NewBinding(
+			key.WithKeys("ctrl+q"),
+			key.WithHelp("ctrl+q", "local cli"),
 		),
 		Suspend: key.NewBinding(
 			key.WithKeys("ctrl+z"),
@@ -132,6 +155,10 @@ func DefaultKeyMap() KeyMap {
 		key.WithKeys("ctrl+v", "super+v"),
 		key.WithHelp("ctrl+v", "paste image from clipboard"),
 	)
+	km.Editor.PasteText = key.NewBinding(
+		key.WithKeys("ctrl+shift+v"),
+		key.WithHelp("ctrl+shift+v", "paste text"),
+	)
 	km.Editor.MentionFile = key.NewBinding(
 		key.WithKeys("@"),
 		key.WithHelp("@", "mention file"),
@@ -157,6 +184,18 @@ func DefaultKeyMap() KeyMap {
 	)
 	km.Editor.HistoryNext = key.NewBinding(
 		key.WithKeys("down"),
+	)
+	km.Editor.CopySelection = key.NewBinding(
+		key.WithKeys("ctrl+shift+c"),
+		key.WithHelp("ctrl+shift+c", "copy selection"),
+	)
+	km.Editor.CutSelection = key.NewBinding(
+		key.WithKeys("ctrl+shift+x"),
+		key.WithHelp("ctrl+shift+x", "cut selection"),
+	)
+	km.Editor.SelectAll = key.NewBinding(
+		key.WithKeys("ctrl+shift+a"),
+		key.WithHelp("ctrl+shift+a", "select all"),
 	)
 
 	km.Chat.NewSession = key.NewBinding(
@@ -259,6 +298,17 @@ func DefaultKeyMap() KeyMap {
 	km.Chat.ScrollRight = key.NewBinding(
 		key.WithKeys("shift+right", "L"),
 		key.WithHelp("shift+→/L", "scroll right"),
+	)
+	km.Chat.EndFollow = key.NewBinding(
+		key.WithKeys("ctrl+end"),
+	)
+	km.Chat.FocusSidebar = key.NewBinding(
+		key.WithKeys("l", "right"),
+		key.WithHelp("l/→", "focus sidebar"),
+	)
+	km.Chat.FocusChat = key.NewBinding(
+		key.WithKeys("h", "left"),
+		key.WithHelp("h/←", "focus chat"),
 	)
 	km.Initialize.Yes = key.NewBinding(
 		key.WithKeys("y", "Y"),

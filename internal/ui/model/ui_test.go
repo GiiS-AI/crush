@@ -74,6 +74,81 @@ func TestCurrentModelSupportsImages(t *testing.T) {
 	})
 }
 
+func TestProviderCLIForSelectedModel(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		model      config.SelectedModel
+		wantBinary string
+		wantLabel  string
+		wantOK     bool
+	}{
+		{
+			name: "codex persisted model",
+			model: config.SelectedModel{
+				Provider: "giis-local",
+				Model:    "codex",
+			},
+			wantBinary: "codex",
+			wantLabel:  "Codex",
+			wantOK:     true,
+		},
+		{
+			name: "real persisted claude-code config",
+			model: config.SelectedModel{
+				Provider: "giis-local",
+				Model:    "claude-code",
+			},
+			wantBinary: "claude",
+			wantLabel:  "Claude Code",
+			wantOK:     true,
+		},
+		{
+			name: "composite model id safety net",
+			model: config.SelectedModel{
+				Provider: "giis-local",
+				Model:    "giis-local/codex",
+			},
+			wantBinary: "codex",
+			wantLabel:  "Codex",
+			wantOK:     true,
+		},
+		{
+			name: "non bridge provider",
+			model: config.SelectedModel{
+				Provider: "anthropic",
+				Model:    "claude-sonnet",
+			},
+		},
+		{
+			name: "unknown bridge model",
+			model: config.SelectedModel{
+				Provider: "giis-local",
+				Model:    "ollama/gemma2:latest",
+			},
+		},
+		{
+			name: "umbrella provider group is not persisted cli selection",
+			model: config.SelectedModel{
+				Provider: "giis-bridge",
+				Model:    "giis-local/codex",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			binary, label, ok := providerCLIForSelectedModel(tt.model)
+			require.Equal(t, tt.wantOK, ok)
+			require.Equal(t, tt.wantBinary, binary)
+			require.Equal(t, tt.wantLabel, label)
+		})
+	}
+}
+
 func newTestUIWithConfig(t *testing.T, cfg *config.Config) *UI {
 	t.Helper()
 

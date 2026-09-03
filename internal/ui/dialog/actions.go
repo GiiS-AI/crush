@@ -13,6 +13,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/message"
 	"github.com/GiiS-AI/GiiS-Code/internal/oauth"
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 	"github.com/GiiS-AI/GiiS-Code/internal/ui/common"
@@ -69,6 +70,13 @@ type (
 	ActionPermissionResponse struct {
 		Permission permission.PermissionRequest
 		Action     PermissionAction
+	}
+	ActionQuestionResponse struct {
+		BatchID   string
+		Responses []question.Answer
+	}
+	ActionQuestionCancel struct {
+		BatchID string
 	}
 	// ActionRunCustomCommand is a message to run a custom command.
 	ActionRunCustomCommand struct {

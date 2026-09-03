@@ -24,6 +24,17 @@ from typing import Optional
 import urllib.request
 import urllib.error
 
+# GiisGamePlan.md Phase 9: "Enforce CLI-subscription-only mode... Disable that
+# fallback or add an explicit mode, and test that no API billing path can be
+# selected accidentally." Previously, call_claude/stream_claude/call_codex used
+# the metered Anthropic/OpenAI API whenever *any* key happened to be stored in
+# workspace.json - e.g. from configuring an unrelated custom provider - which
+# would silently bill real money instead of using the flat-rate CLI
+# subscriptions this shim exists to wrap. Now the paid-API path requires
+# deliberately setting this env var; an accidentally-present stored key can no
+# longer trigger it on its own.
+ALLOW_PAID_API_FALLBACK = os.environ.get("GIIS_SHIM_ALLOW_PAID_API_FALLBACK") == "1"
+
 
 def get_api_key(provider: str) -> Optional[str]:
     """Read stored API key from giis-code workspace config."""
@@ -100,8 +111,9 @@ def call_claude_api(prompt: str, api_key: str) -> str:
 
 
 def call_claude(prompt: str) -> str:
-    """Call Claude (via API or CLI fallback) and return the result text."""
-    api_key = get_api_key("claude")
+    """Call Claude (via CLI subscription by default; metered API only if
+    GIIS_SHIM_ALLOW_PAID_API_FALLBACK=1 is explicitly set)."""
+    api_key = get_api_key("claude") if ALLOW_PAID_API_FALLBACK else None
     if api_key:
         return call_claude_api(prompt, api_key)
 
@@ -155,8 +167,9 @@ def stream_claude_api(prompt: str, api_key: str):
 
 
 def stream_claude(prompt: str):
-    """Stream Claude response (via API or CLI fallback)."""
-    api_key = get_api_key("claude")
+    """Stream Claude response (via CLI subscription by default; metered API
+    only if GIIS_SHIM_ALLOW_PAID_API_FALLBACK=1 is explicitly set)."""
+    api_key = get_api_key("claude") if ALLOW_PAID_API_FALLBACK else None
     if api_key:
         yield from stream_claude_api(prompt, api_key)
         return
@@ -219,8 +232,9 @@ def call_openai_api(prompt: str, api_key: str) -> str:
 
 
 def call_codex(prompt: str) -> str:
-    """Call Codex/OpenAI (via API or CLI fallback) and return the result text."""
-    api_key = get_api_key("codex")
+    """Call Codex (via CLI subscription by default; metered OpenAI API only
+    if GIIS_SHIM_ALLOW_PAID_API_FALLBACK=1 is explicitly set)."""
+    api_key = get_api_key("codex") if ALLOW_PAID_API_FALLBACK else None
     if api_key:
         return call_openai_api(prompt, api_key)
 

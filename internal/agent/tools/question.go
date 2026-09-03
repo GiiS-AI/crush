@@ -1,0 +1,203 @@
+package tools
+
+import (
+	"context"
+	_ "embed"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+
+	"charm.land/fantasy"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
+)
+
+const QuestionToolName = "question"
+
+//go:embed question.md
+var questionDescription string
+
+// QuestionParams defines the parameters for the question tool.
+type QuestionParams struct {
+	Questions          []QuestionItem `json:"questions" description:"List of questions to present. Single item = no tabs, multiple = tabbed form."`
+	ConfirmTitle       string         `json:"confirm_title,omitempty" description:"Title for the confirmation tab shown for multi-question batches."`
+	ConfirmDescription string         `json:"confirm_description,omitempty" description:"Description for the confirmation tab shown for multi-question batches."`
+}
+
+// UnmarshalJSON handles models that serialize the questions field as a string.
+func (p *QuestionParams) UnmarshalJSON(data []byte) error {
+	type alias QuestionParams
+	aux := &struct {
+		Questions json.RawMessage `json:"questions"`
+		*alias
+	}{
+		alias: (*alias)(p),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if len(aux.Questions) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(aux.Questions, &p.Questions); err == nil {
+		return nil
+	}
+	var encoded string
+	if err := json.Unmarshal(aux.Questions, &encoded); err != nil {
+		return err
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(encoded)), &p.Questions); err != nil {
+		return fmt.Errorf("questions must be an array: %w", err)
+	}
+	return nil
+}
+
+// QuestionItem is a single question from the tool input.
+type QuestionItem struct {
+	Label       string           `json:"label,omitempty" description:"Optional short tab header label (three words max)."`
+	Type        string           `json:"type" description:"The type of question: yes_no, single_choice, multi_choice, or free_text."`
+	Question    string           `json:"question" description:"The question text shown to the user."`
+	Description string           `json:"description" description:"Required markdown context shown below the question."`
+	Choices     []QuestionChoice `json:"choices,omitempty" description:"List of selectable choices for single_choice and multi_choice questions."`
+	Options     []QuestionChoice `json:"options,omitempty"`
+}
+
+// GetChoices returns choices, preferring the canonical Choices field.
+func (q QuestionItem) GetChoices() []QuestionChoice {
+	if len(q.Choices) > 0 {
+		return q.Choices
+	}
+	return q.Options
+}
+
+// QuestionChoice represents a selectable option.
+type QuestionChoice struct {
+	ID          string `json:"id" description:"Unique identifier for this choice."`
+	Label       string `json:"label" description:"Display text for this choice."`
+	Description string `json:"description,omitempty" description:"Optional description for this choice."`
+}
+
+// NewQuestionTool creates a new question tool.
+func NewQuestionTool(svc question.Service) fantasy.AgentTool {
+	return fantasy.NewAgentTool(
+		QuestionToolName,
+		questionDescription,
+		func(ctx context.Context, params QuestionParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+			if len(params.Questions) == 0 {
+				return fantasy.NewTextErrorResponse("at least one question is required"), nil
+			}
+			if len(params.Questions) > question.MaxQuestions {
+				return fantasy.NewTextErrorResponse(fmt.Sprintf(
+					"exceeds maximum of %d questions per batch (got %d). Split into multiple batches and tell the user there will be follow-up questions",
+					question.MaxQuestions,
+					len(params.Questions),
+				)), nil
+			}
+
+			questions := make([]question.Question, len(params.Questions))
+			for i, item := range params.Questions {
+				qType := question.Type(item.Type)
+				switch qType {
+				case question.TypeYesNo, question.TypeSingleChoice, question.TypeMultiChoice, question.TypeFreeText:
+				default:
+					label := item.Label
+					if label == "" {
+						label = item.Question
+					}
+					return fantasy.NewTextErrorResponse(fmt.Sprintf(
+						"question %d [%s]: invalid type %q (must be yes_no, single_choice, multi_choice, or free_text)",
+						i+1,
+						label,
+						item.Type,
+					)), nil
+				}
+				questions[i] = question.Question{
+					Type:        qType,
+					Label:       item.Label,
+					Text:        item.Question,
+					Description: item.Description,
+					Choices:     convertQuestionChoices(item.GetChoices()),
+				}
+			}
+
+			answers, err := svc.Ask(ctx, question.Request{
+				SessionID:          GetSessionFromContext(ctx),
+				ToolCallID:         call.ID,
+				Questions:          questions,
+				ConfirmTitle:       params.ConfirmTitle,
+				ConfirmDescription: params.ConfirmDescription,
+			})
+			if err != nil {
+				if errors.Is(err, question.ErrCancelled) {
+					resp := fantasy.NewTextErrorResponse("User cancelled this question")
+					resp.StopTurn = true
+					return resp, nil
+				}
+				return fantasy.NewTextErrorResponse(err.Error()), nil
+			}
+
+			return formatQuestionAnswers(answers, questions)
+		},
+	)
+}
+
+func convertQuestionChoices(in []QuestionChoice) []question.Choice {
+	out := make([]question.Choice, len(in))
+	for i, c := range in {
+		out[i] = question.Choice{ID: c.ID, Label: c.Label, Description: c.Description}
+	}
+	return out
+}
+
+func formatQuestionAnswers(answers []question.Answer, questions []question.Question) (fantasy.ToolResponse, error) {
+	var b strings.Builder
+	for i, answer := range answers {
+		if i > 0 {
+			b.WriteString("\n\n")
+		}
+		if i < len(questions) {
+			fmt.Fprintf(&b, "Q%d: %s\n", i+1, questions[i].Text)
+		}
+		formatted, _ := formatQuestionAnswer(&answer)
+		b.WriteString(formatted.Content)
+	}
+	return fantasy.NewTextResponse(b.String()), nil
+}
+
+func formatQuestionAnswer(answer *question.Answer) (fantasy.ToolResponse, error) {
+	var b strings.Builder
+
+	switch {
+	case answer.Yes != nil:
+		if *answer.Yes {
+			b.WriteString("User answered: yes")
+		} else {
+			b.WriteString("User answered: no")
+		}
+	case len(answer.SelectedIDs) > 0 || answer.FillInText != "":
+		var parts []string
+		if len(answer.SelectedIDs) > 0 {
+			data, _ := json.Marshal(answer.SelectedIDs)
+			parts = append(parts, fmt.Sprintf("User selected: %s", string(data)))
+		}
+		if answer.FillInText != "" {
+			parts = append(parts, fmt.Sprintf("User provided: %s", answer.FillInText))
+		}
+		b.WriteString(strings.Join(parts, "\n"))
+	default:
+		b.WriteString("User skipped this question")
+	}
+
+	if len(answer.Notes) > 0 {
+		b.WriteString("\n\nNotes:")
+		for key, note := range answer.Notes {
+			if key == "_question" {
+				fmt.Fprintf(&b, "\n- %s", note)
+			} else {
+				fmt.Fprintf(&b, "\n- [%s]: %s", key, note)
+			}
+		}
+	}
+
+	return fantasy.NewTextResponse(b.String()), nil
+}

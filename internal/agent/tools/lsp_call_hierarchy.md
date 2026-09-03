@@ -1,0 +1,1 @@
+Show the call hierarchy for a symbol: either incoming calls (who calls this) or outgoing calls (what this calls). Use this before refactoring to understand blast radius or when tracing execution flow. Returns callers or callees with file paths and line numbers.

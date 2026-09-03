@@ -187,6 +187,9 @@ func Providers(cfg *Config) ([]catwalk.Provider, error) {
 				errs = append(errs, fmt.Errorf("GiiS-Code was unable to fetch updated information from Hyper: %w", err)) //nolint:staticcheck
 				return
 			}
+			// Override whatever display name the upstream Hyper API returns
+			// so it consistently shows as "Hyper" in the model picker.
+			item.Name = "Hyper"
 			hyperProvider = item
 			hyperFound = true
 		})

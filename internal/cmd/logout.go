@@ -29,7 +29,7 @@ The platform should be provided as an argument.
 If no argument is given, a list of logged-in platforms will be shown.
 Available platforms are: hyper, copilot, giis-cloud, claude, codex.`,
 	Example: `
-# Sign out from Charm Hyper
+# Sign out from c0d3r
 c0d3r logout hyper
 
 	# Sign out from GitHub Copilot

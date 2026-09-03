@@ -19,6 +19,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/oauth"
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/GiiS-AI/GiiS-Code/internal/proto"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/shell"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
@@ -71,10 +72,12 @@ func (w *AppWorkspace) ParseAgentToolSessionID(sessionID string) (string, string
 	return w.app.Sessions.ParseAgentToolSessionID(sessionID)
 }
 
-// SetCurrentSession is a no-op in single-client local mode. The
-// presence concept only matters when multiple clients can share a
-// workspace via the HTTP server.
+// SetCurrentSession reports the active session to herdr so the pane can
+// persist a resumable reference. Multi-client presence tracking is
+// irrelevant in single-client local mode, but herdr still needs to know
+// which session is live to support agent resume.
 func (w *AppWorkspace) SetCurrentSession(ctx context.Context, sessionID string) error {
+	w.app.ReportCurrentSession(sessionID)
 	return nil
 }
 
@@ -256,6 +259,16 @@ func (w *AppWorkspace) PermissionSkipRequests() bool {
 
 func (w *AppWorkspace) PermissionSetSkipRequests(skip bool) {
 	w.app.Permissions.SetSkipRequests(skip)
+}
+
+// -- Questions --
+
+func (w *AppWorkspace) QuestionAnswer(batchID string, responses []question.Answer) bool {
+	return w.app.Questions.Answer(batchID, responses)
+}
+
+func (w *AppWorkspace) QuestionCancel(batchID string) bool {
+	return w.app.Questions.Cancel(batchID)
 }
 
 // -- FileTracker --

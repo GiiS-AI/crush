@@ -66,7 +66,7 @@ func RefreshResources(ctx context.Context, name string) {
 
 	resources, err := getResources(ctx, session)
 	if err != nil {
-		updateState(name, StateError, err, nil, Counts{})
+		updateState(name, StateError, err, session, Counts{})
 		return
 	}
 

@@ -116,7 +116,7 @@ func TestHyperSync_GetClientError(t *testing.T) {
 
 	provider, err := syncer.Get(t.Context())
 	require.NoError(t, err) // Should fall back to embedded.
-	require.Equal(t, "Charm Hyper", provider.Name)
+	require.Equal(t, "c0d3r", provider.Name)
 	require.Equal(t, catwalk.InferenceProvider("hyper"), provider.ID)
 }
 

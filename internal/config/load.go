@@ -871,11 +871,49 @@ func loadFromBytes(configs [][]byte) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	data, err = migrateLegacyProviderEndpoints(data)
+	if err != nil {
+		return nil, err
+	}
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
 	return &config, nil
+}
+
+// migrateLegacyProviderEndpoints keeps existing GiiS-Code provider settings
+// usable after the configuration field was renamed from api_endpoint to
+// base_url. The migration is in-memory so loading configuration never mutates
+// a user's file as a side effect.
+func migrateLegacyProviderEndpoints(data []byte) ([]byte, error) {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+
+	providers, ok := raw["providers"].(map[string]any)
+	if !ok {
+		return data, nil
+	}
+
+	for _, rawProvider := range providers {
+		provider, ok := rawProvider.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, hasBaseURL := provider["base_url"]; hasBaseURL {
+			continue
+		}
+		endpoint, ok := provider["api_endpoint"].(string)
+		if !ok || endpoint == "" {
+			continue
+		}
+		provider["base_url"] = endpoint
+		delete(provider, "api_endpoint")
+	}
+
+	return json.Marshal(raw)
 }
 
 func hasAWSCredentials(env env.Env) bool {

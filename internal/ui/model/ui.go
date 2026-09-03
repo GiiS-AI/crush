@@ -32,6 +32,7 @@ import (
 	agenttools "github.com/GiiS-AI/GiiS-Code/internal/agent/tools"
 	"github.com/GiiS-AI/GiiS-Code/internal/agent/tools/mcp"
 	"github.com/GiiS-AI/GiiS-Code/internal/app"
+	"github.com/GiiS-AI/GiiS-Code/internal/bridge"
 	"github.com/GiiS-AI/GiiS-Code/internal/clipboard"
 	"github.com/GiiS-AI/GiiS-Code/internal/commands"
 	"github.com/GiiS-AI/GiiS-Code/internal/config"
@@ -41,6 +42,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/message"
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
 	"github.com/GiiS-AI/GiiS-Code/internal/stringext"
@@ -97,6 +99,7 @@ const (
 	uiFocusNone uiFocusState = iota
 	uiFocusEditor
 	uiFocusMain
+	uiFocusSidebar
 )
 
 type uiState uint8
@@ -270,6 +273,18 @@ type UI struct {
 	// sidebarLogo keeps a cached version of the sidebar sidebarLogo.
 	sidebarLogo string
 
+	// Sidebar scroll state for virtual scrolling.
+	sidebarOffset           int  // current scroll offset in lines
+	sidebarScrollable       bool // true when sidebar content exceeds available height
+	sidebarScrollbarVisible bool
+	sidebarScrollbarSeq     int    // sequence number for auto-hide timer
+	sidebarMaxOffsetVal     int    // max scroll offset, computed in updateSidebarScrollState
+	sidebarContent          string // cached rendered sidebar content
+	sidebarTotalLines       int    // total lines in sidebarContent
+	sidebarContentHeight    int    // available height for sidebar content
+	sidebarContentWidth     int    // available width for sidebar content
+	sidebarDrawLogo         string // logo to render (may differ from sidebarLogo for short heights)
+
 	// Notification state
 	notifyBackend       notification.Backend
 	notifyWindowFocused bool
@@ -323,6 +338,16 @@ func New(com *common.Common, initialSessionID string, continueLast bool) *UI {
 	ta.DynamicHeight = true
 	ta.MinHeight = TextareaMinHeight
 	ta.MaxHeight = TextareaMaxHeight
+	// Keep "ctrl+a" for line-start (the textarea default); bind select-all
+	// to "ctrl+shift+a" instead (line-start is also available via "home").
+	ta.KeyMap.LineStart = key.NewBinding(
+		key.WithKeys("home", "ctrl+a"),
+		key.WithHelp("home", "line start"),
+	)
+	ta.KeyMap.SelectAll = key.NewBinding(
+		key.WithKeys("ctrl+shift+a"),
+		key.WithHelp("ctrl+shift+a", "select all"),
+	)
 	ta.Focus()
 
 	ch := NewChat(com)
@@ -776,6 +801,18 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case pubsub.Event[permission.PermissionNotification]:
 		m.handlePermissionNotification(msg.Payload)
+	case pubsub.Event[question.Request]:
+		if cmd := m.openQuestionDialog(msg.Payload); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		if cmd := m.sendNotification(notification.Notification{
+			Title:   "GiiS-Code is waiting...",
+			Message: "Question input required",
+		}); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	case pubsub.Event[question.Notification]:
+		m.handleQuestionNotification(msg.Payload)
 	case cancelTimerExpiredMsg:
 		m.isCanceling = false
 	case tea.TerminalVersionMsg:
@@ -904,6 +941,17 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// others send DeltaY=1.
 		switch m.state {
 		case uiChat:
+			// When sidebar is focused, route wheel events to sidebar scrolling.
+			if m.focus == uiFocusSidebar {
+				lines := int(msg.DeltaY)
+				if lines != 0 {
+					m.sidebarOffset = max(0, min(m.sidebarOffset+lines, m.sidebarMaxOffsetVal))
+					m.sidebarScrollbarSeq++
+					m.sidebarScrollbarVisible = true
+					cmds = append(cmds, sidebarScrollbarHideCmd(m.sidebarScrollbarSeq))
+				}
+				break
+			}
 			if msg.DeltaX != 0 {
 				m.chat.ScrollSelectedShellHorizontal(int(msg.DeltaX))
 			}
@@ -926,6 +974,10 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			}
+		}
+	case sidebarScrollbarHideMsg:
+		if msg.seq == m.sidebarScrollbarSeq && m.focus != uiFocusSidebar {
+			m.sidebarScrollbarVisible = false
 		}
 	case anim.StepMsg:
 		if m.state == uiChat {
@@ -1283,14 +1335,19 @@ func (m *UI) handleClickFocus(msg tea.MouseClickMsg) (cmd tea.Cmd) {
 	switch {
 	case m.state != uiChat:
 		return nil
-	case image.Pt(msg.X, msg.Y).In(m.layout.sidebar):
+	case m.focus != uiFocusSidebar && image.Pt(msg.X, msg.Y).In(m.layout.sidebar) && m.sidebarScrollable:
+		m.focus = uiFocusSidebar
+		m.textarea.Blur()
+		m.chat.Blur()
 		return nil
 	case m.focus != uiFocusEditor && image.Pt(msg.X, msg.Y).In(m.layout.editor):
 		m.focus = uiFocusEditor
 		cmd = m.textarea.Focus()
+		m.sidebarScrollbarVisible = false
 		m.chat.Blur()
 	case m.focus != uiFocusMain && image.Pt(msg.X, msg.Y).In(m.layout.main):
 		m.focus = uiFocusMain
+		m.sidebarScrollbarVisible = false
 		m.textarea.Blur()
 		m.chat.Focus()
 	}
@@ -1678,6 +1735,12 @@ func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {
 		case dialog.PermissionDeny:
 			m.com.Workspace.PermissionDeny(msg.Permission)
 		}
+	case dialog.ActionQuestionResponse:
+		m.dialog.CloseDialog(dialog.QuestionDialogID(msg.BatchID))
+		m.com.Workspace.QuestionAnswer(msg.BatchID, msg.Responses)
+	case dialog.ActionQuestionCancel:
+		m.dialog.CloseDialog(dialog.QuestionDialogID(msg.BatchID))
+		m.com.Workspace.QuestionCancel(msg.BatchID)
 
 	case dialog.ActionFilePickerSelected:
 		cmds = append(cmds, tea.Sequence(
@@ -1933,6 +1996,11 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 				cmds = append(cmds, cmd)
 			}
 			return true
+		case key.Matches(msg, m.keyMap.ProviderCLI):
+			if cmd := m.openSelectedProviderCLI(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			return true
 		case key.Matches(msg, m.keyMap.Sessions):
 			if cmd := m.openSessionsDialog(); cmd != nil {
 				cmds = append(cmds, cmd)
@@ -1942,6 +2010,13 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 			m.detailsOpen = !m.detailsOpen
 			m.updateLayoutAndSize()
 			return true
+		case key.Matches(msg, m.keyMap.Chat.EndFollow):
+			if m.state == uiChat && m.hasSession() {
+				if cmd := m.chat.ScrollToBottomAndSelectLast(); cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+				return true
+			}
 		case key.Matches(msg, m.keyMap.Chat.TogglePills):
 			if m.state == uiChat && m.hasSession() {
 				if cmd := m.togglePillsExpanded(); cmd != nil {
@@ -2056,6 +2131,8 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 					break
 				}
 				cmds = append(cmds, m.pasteImageFromClipboard)
+			case key.Matches(msg, m.keyMap.Editor.PasteText):
+				cmds = append(cmds, m.pasteTextFromClipboard)
 
 			case key.Matches(msg, m.keyMap.Editor.SendMessage):
 				prevHeight := m.textarea.Height()
@@ -2132,6 +2209,24 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 				m.textarea.InsertRune('\n')
 				m.closeCompletions()
 				cmds = append(cmds, m.updateTextareaWithPrevHeight(msg, prevHeight))
+			case key.Matches(msg, m.keyMap.Editor.CopySelection):
+				if m.textarea.HasSelection() {
+					cmds = append(cmds, common.CopyToClipboardWithCallback(
+						m.textarea.SelectedText(),
+						"Selection copied to clipboard",
+						nil,
+					))
+					m.textarea.ClearSelection()
+				}
+			case key.Matches(msg, m.keyMap.Editor.CutSelection):
+				if m.textarea.HasSelection() {
+					cmds = append(cmds, common.CopyToClipboardWithCallback(
+						m.textarea.SelectedText(),
+						"Selection cut to clipboard",
+						nil,
+					))
+					m.textarea.DeleteSelection()
+				}
 			case key.Matches(msg, m.keyMap.Editor.HistoryPrev):
 				cmd := m.handleHistoryUp(msg)
 				if cmd != nil {
@@ -2251,8 +2346,14 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 			switch {
 			case key.Matches(msg, m.keyMap.Tab):
 				m.focus = uiFocusEditor
+				m.sidebarScrollbarVisible = false
 				cmds = append(cmds, m.textarea.Focus())
 				m.chat.Blur()
+			case key.Matches(msg, m.keyMap.Chat.FocusSidebar):
+				if m.state == uiChat && !m.isCompact && m.hasSession() && m.sidebarScrollable {
+					m.focus = uiFocusSidebar
+					m.chat.Blur()
+				}
 			case key.Matches(msg, m.keyMap.Chat.NewSession):
 				if !m.hasSession() {
 					break
@@ -2334,6 +2435,38 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 					handleGlobalKeys(msg)
 				}
 			}
+		case uiFocusSidebar:
+			if m.state != uiChat || m.isCompact || !m.hasSession() {
+				break
+			}
+			switch {
+			case key.Matches(msg, m.keyMap.Chat.Up):
+				m.sidebarOffset = max(0, m.sidebarOffset-4)
+				m.sidebarScrollbarSeq++
+			case key.Matches(msg, m.keyMap.Chat.Down):
+				maxOffset := m.sidebarMaxOffsetVal
+				if m.sidebarOffset < maxOffset {
+					m.sidebarOffset = min(m.sidebarOffset+4, maxOffset)
+					m.sidebarScrollbarSeq++
+				}
+			case key.Matches(msg, m.keyMap.Chat.Home):
+				m.sidebarOffset = 0
+				m.sidebarScrollbarSeq++
+			case key.Matches(msg, m.keyMap.Chat.End):
+				m.sidebarOffset = m.sidebarMaxOffsetVal
+				m.sidebarScrollbarSeq++
+			case key.Matches(msg, m.keyMap.Chat.FocusChat):
+				m.focus = uiFocusMain
+				m.sidebarScrollbarVisible = false
+				m.chat.Focus()
+			case key.Matches(msg, m.keyMap.Tab):
+				m.focus = uiFocusEditor
+				m.sidebarScrollbarVisible = false
+				cmds = append(cmds, m.textarea.Focus())
+				m.chat.Blur()
+			default:
+				handleGlobalKeys(msg)
+			}
 		default:
 			handleGlobalKeys(msg)
 		}
@@ -2364,6 +2497,10 @@ func (m *UI) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	if m.layout != layout {
 		m.layout = layout
 		m.updateSize()
+	}
+
+	if m.state == uiChat && m.hasSession() && !m.isCompact {
+		m.updateSidebarScrollState()
 	}
 
 	// Clear the screen first
@@ -2548,6 +2685,7 @@ func (m *UI) ShortHelp() []key.Binding {
 			tab,
 			commands,
 			k.Models,
+			k.ProviderCLI,
 		)
 
 		switch m.focus {
@@ -2555,6 +2693,12 @@ func (m *UI) ShortHelp() []key.Binding {
 			binds = append(
 				binds,
 				k.Editor.Newline,
+			)
+		case uiFocusSidebar:
+			binds = append(
+				binds,
+				k.Chat.UpDown,
+				k.Chat.FocusChat,
 			)
 		case uiFocusMain:
 			binds = append(
@@ -2634,11 +2778,12 @@ func (m *UI) FullHelp() [][]key.Binding {
 			tab,
 			commands,
 			k.Models,
+			k.ProviderCLI,
 			k.Sessions,
 			k.ToggleYolo,
 		)
 		if hasSession {
-			mainBinds = append(mainBinds, k.Chat.NewSession)
+			mainBinds = append(mainBinds, k.Chat.NewSession, k.Chat.EndFollow)
 		}
 
 		binds = append(binds, mainBinds)
@@ -2649,6 +2794,10 @@ func (m *UI) FullHelp() [][]key.Binding {
 				k.Editor.Newline,
 				k.Editor.MentionFile,
 				k.Editor.OpenEditor,
+				k.Editor.PasteText,
+				k.Editor.SelectAll,
+				k.Editor.CopySelection,
+				k.Editor.CutSelection,
 			}
 			if m.currentModelSupportsImages() {
 				editorBinds = append(editorBinds, k.Editor.AddImage, k.Editor.PasteImage)
@@ -2664,6 +2813,20 @@ func (m *UI) FullHelp() [][]key.Binding {
 					},
 				)
 			}
+		case uiFocusSidebar:
+			binds = append(
+				binds,
+				[]key.Binding{
+					k.Chat.UpDown,
+				},
+				[]key.Binding{
+					k.Chat.FocusChat,
+				},
+				[]key.Binding{
+					k.Chat.Home,
+					k.Chat.End,
+				},
+			)
 		case uiFocusMain:
 			binds = append(
 				binds,
@@ -2678,6 +2841,8 @@ func (m *UI) FullHelp() [][]key.Binding {
 					k.Chat.HalfPageDown,
 					k.Chat.Home,
 					k.Chat.End,
+					k.Chat.EndFollow,
+					k.Chat.FocusSidebar,
 				},
 				[]key.Binding{
 					k.Chat.Copy,
@@ -2696,6 +2861,7 @@ func (m *UI) FullHelp() [][]key.Binding {
 				[]key.Binding{
 					commands,
 					k.Models,
+					k.ProviderCLI,
 					k.Sessions,
 					k.ToggleYolo,
 				},
@@ -2704,6 +2870,10 @@ func (m *UI) FullHelp() [][]key.Binding {
 				k.Editor.Newline,
 				k.Editor.MentionFile,
 				k.Editor.OpenEditor,
+				k.Editor.PasteText,
+				k.Editor.SelectAll,
+				k.Editor.CopySelection,
+				k.Editor.CutSelection,
 			}
 			if m.currentModelSupportsImages() {
 				editorBinds = append(editorBinds, k.Editor.AddImage, k.Editor.PasteImage)
@@ -2744,6 +2914,60 @@ func (m *UI) currentModelSupportsImages() bool {
 	}
 	model := cfg.GetModelByType(agentCfg.Model)
 	return model != nil && model.SupportsImages
+}
+
+func (m *UI) openSelectedProviderCLI() tea.Cmd {
+	if m.isAgentBusy() {
+		return util.ReportWarn("Agent is busy, please wait...")
+	}
+
+	binary, label, ok := m.selectedProviderCLI()
+	if !ok {
+		return util.ReportWarn("No local Claude/Codex CLI is selected")
+	}
+
+	cmd, err := bridge.BuildProviderCLICommand(context.Background(), binary, nil)
+	if err != nil {
+		return util.ReportError(err)
+	}
+
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			return util.NewErrorMsg(fmt.Errorf("%s CLI exited with error: %w", label, err))
+		}
+		return util.NewInfoMsg(label + " CLI closed")
+	})
+}
+
+func (m *UI) selectedProviderCLI() (binary, label string, ok bool) {
+	cfg := m.com.Config()
+	if cfg == nil {
+		return "", "", false
+	}
+	agentCfg, ok := cfg.Agents[config.AgentCoder]
+	if !ok {
+		return "", "", false
+	}
+	currentModel, ok := cfg.Models[agentCfg.Model]
+	if !ok {
+		return "", "", false
+	}
+	return providerCLIForSelectedModel(currentModel)
+}
+
+func providerCLIForSelectedModel(model config.SelectedModel) (binary, label string, ok bool) {
+	if model.Provider != "giis-local" {
+		return "", "", false
+	}
+
+	switch strings.TrimPrefix(model.Model, "giis-local/") {
+	case "codex":
+		return bridge.CodexCLIBinary, "Codex", true
+	case "claude-code":
+		return bridge.ClaudeCodeCLIBinary, "Claude Code", true
+	default:
+		return "", "", false
+	}
 }
 
 // toggleCompactMode toggles compact mode between uiChat and uiChatCompact states.
@@ -3798,6 +4022,19 @@ func (m *UI) openPermissionsDialog(perm permission.PermissionRequest) tea.Cmd {
 	return nil
 }
 
+// openQuestionDialog opens the structured question dialog for a pending batch.
+func (m *UI) openQuestionDialog(batch question.Request) tea.Cmd {
+	dialogID := dialog.QuestionDialogID(batch.ID)
+	if m.dialog.ContainsDialog(dialogID) {
+		m.dialog.BringToFront(dialogID)
+		return nil
+	}
+
+	q := dialog.NewQuestion(m.com, batch)
+	m.dialog.OpenDialogWithGrace(q)
+	return nil
+}
+
 // handlePermissionNotification updates tool items when permission state changes.
 func (m *UI) handlePermissionNotification(notification permission.PermissionNotification) {
 	if toolItem := m.chat.MessageItem(notification.ToolCallID); toolItem != nil {
@@ -3821,6 +4058,12 @@ func (m *UI) handlePermissionNotification(notification permission.PermissionNoti
 			m.dialog.CloseDialog(dialog.PermissionsID)
 		}
 	}
+}
+
+// handleQuestionNotification closes an open question dialog when the batch is
+// resolved locally or by another client.
+func (m *UI) handleQuestionNotification(notification question.Notification) {
+	m.dialog.CloseDialog(dialog.QuestionDialogID(notification.BatchID))
 }
 
 // handleAgentNotification translates domain agent events into desktop
@@ -4030,6 +4273,19 @@ func (m *UI) handleFilePathPaste(path string) tea.Cmd {
 			Content:  content,
 		}
 	}
+}
+
+// pasteTextFromClipboard reads text from the system clipboard and returns a
+// tea.PasteMsg so it flows through the same paste logic as bracketed paste.
+func (m *UI) pasteTextFromClipboard() tea.Msg {
+	textData, err := clipboard.Read(clipboard.FormatText)
+	if err != nil || len(textData) == 0 {
+		return util.InfoMsg{
+			Type: util.InfoTypeError,
+			Msg:  "Clipboard is empty or does not contain text",
+		}
+	}
+	return tea.PasteMsg{Content: string(textData)}
 }
 
 // pasteImageFromClipboard reads image data from the system clipboard and

@@ -14,6 +14,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/config"
 	"github.com/GiiS-AI/GiiS-Code/internal/message"
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 )
 
@@ -70,6 +71,7 @@ func NewCoordinator(
 		sessions,
 		messages,
 		permission.NewPermissionService(workingDir, true, nil),
+		question.NewService(),
 		nil,
 		nil,
 		nil,

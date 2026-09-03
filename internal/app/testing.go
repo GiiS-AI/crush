@@ -8,6 +8,7 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/agent/notify"
 	"github.com/GiiS-AI/GiiS-Code/internal/permission"
 	"github.com/GiiS-AI/GiiS-Code/internal/pubsub"
+	"github.com/GiiS-AI/GiiS-Code/internal/question"
 )
 
 // NewForTest constructs a minimal [App] suitable for in-process tests
@@ -29,6 +30,7 @@ import (
 func NewForTest(ctx context.Context) *App {
 	app := &App{
 		Permissions:        permission.NewPermissionService("", false, nil),
+		Questions:          question.NewService(),
 		globalCtx:          ctx,
 		events:             pubsub.NewBroker[tea.Msg](),
 		serviceEventsWG:    &sync.WaitGroup{},
@@ -43,6 +45,10 @@ func NewForTest(ctx context.Context) *App {
 		app.Permissions.Subscribe, app.events)
 	setupSubscriber(eventsCtx, app.serviceEventsWG, "permissions-notifications",
 		app.Permissions.SubscribeNotifications, app.events)
+	setupSubscriber(eventsCtx, app.serviceEventsWG, "questions",
+		app.Questions.Subscribe, app.events)
+	setupSubscriber(eventsCtx, app.serviceEventsWG, "question-notifications",
+		app.Questions.SubscribeNotifications, app.events)
 	setupSubscriber(eventsCtx, app.serviceEventsWG, "agent-notifications",
 		app.agentNotifications.Subscribe, app.events)
 	setupSubscriber(eventsCtx, app.serviceEventsWG, "run-completions",

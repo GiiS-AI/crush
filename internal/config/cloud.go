@@ -59,7 +59,7 @@ func (s *cloudSync) Get(ctx context.Context) (catwalk.Provider, error) {
 		if cached.ID == "" || cachedErr != nil {
 			cached = catwalk.Provider{
 				ID:          catwalk.InferenceProvider("giis-cloud"),
-				Name:        "GiiS Cloud",
+				Name:        "GiiS",
 				Type:        catwalk.TypeOpenAICompat,
 				APIEndpoint: cloudBaseURL(),
 			}
@@ -77,7 +77,7 @@ func (s *cloudSync) Get(ctx context.Context) (catwalk.Provider, error) {
 		}
 
 		s.result = catwalk.Provider{
-			Name:        "GiiS Cloud",
+			Name:        "GiiS",
 			ID:          catwalk.InferenceProvider("giis-cloud"),
 			APIEndpoint: cloudBaseURL(),
 			Type:        catwalk.TypeOpenAICompat,
