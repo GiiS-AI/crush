@@ -771,8 +771,8 @@ func quickStyle(o quickStyleOpts) Styles {
 
 	// Logo
 	s.Logo.FieldColor = o.primary
-	s.Logo.TitleColorA = o.secondary
-	s.Logo.TitleColorB = o.primary
+	s.Logo.TitleColorA = o.primary
+	s.Logo.TitleColorB = o.secondary
 	s.Logo.CharmColor = o.secondary
 	s.Logo.VersionColor = o.primary
 	s.Logo.SmallCharm = lipgloss.NewStyle().Foreground(o.secondary)

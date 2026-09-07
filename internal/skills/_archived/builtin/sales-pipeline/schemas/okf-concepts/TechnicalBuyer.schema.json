@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "TechnicalBuyer.schema.json",
+  "title": "TechnicalBuyer",
+  "description": "Person who evaluates fit",
+  "type": "object",
+  "required": [
+    "type",
+    "title"
+  ],
+  "properties": {
+    "type": {
+      "const": "TechnicalBuyer"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "links": {
+      "type": "array"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "Opportunity.schema.json",
+  "title": "Opportunity",
+  "description": "Qualified revenue chance",
+  "type": "object",
+  "required": [
+    "type",
+    "title"
+  ],
+  "properties": {
+    "type": {
+      "const": "Opportunity"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "links": {
+      "type": "array"
+    }
+  }
+}

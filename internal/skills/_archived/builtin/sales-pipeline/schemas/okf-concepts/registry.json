@@ -1,0 +1,111 @@
+{
+  "version": "0.3.1",
+  "plugin": "sales-pipeline",
+  "types": [
+    {
+      "type": "SalesLead",
+      "folder": "sales-leads",
+      "description": "Named inbound or outbound lead"
+    },
+    {
+      "type": "Opportunity",
+      "folder": "opportunities",
+      "description": "Qualified revenue chance"
+    },
+    {
+      "type": "Deal",
+      "folder": "deals",
+      "description": "Actively negotiated opportunity"
+    },
+    {
+      "type": "Stage",
+      "folder": "stages",
+      "description": "Pipeline stage definition"
+    },
+    {
+      "type": "NextAction",
+      "folder": "next-actions",
+      "description": "Required next step with date"
+    },
+    {
+      "type": "Objection",
+      "folder": "objections",
+      "description": "Buyer concern"
+    },
+    {
+      "type": "Competitor",
+      "folder": "competitors",
+      "description": "Competing alternative"
+    },
+    {
+      "type": "Champion",
+      "folder": "champions",
+      "description": "Internal advocate"
+    },
+    {
+      "type": "EconomicBuyer",
+      "folder": "economic-buyers",
+      "description": "Person who can spend"
+    },
+    {
+      "type": "TechnicalBuyer",
+      "folder": "technical-buyers",
+      "description": "Person who evaluates fit"
+    },
+    {
+      "type": "Proposal",
+      "folder": "proposals",
+      "description": "Written offer"
+    },
+    {
+      "type": "Quote",
+      "folder": "quotes",
+      "description": "Priced offer"
+    },
+    {
+      "type": "Contract",
+      "folder": "contracts",
+      "description": "Legal agreement in play"
+    },
+    {
+      "type": "NegotiationNote",
+      "folder": "negotiation-notes",
+      "description": "Deal-desk note"
+    },
+    {
+      "type": "WinLossReason",
+      "folder": "win-loss-reasons",
+      "description": "Why it closed"
+    },
+    {
+      "type": "SalesCampaign",
+      "folder": "sales-campaigns",
+      "description": "Outbound or inbound motion"
+    },
+    {
+      "type": "OutreachSequence",
+      "folder": "outreach-sequences",
+      "description": "Sequence of touches"
+    },
+    {
+      "type": "Touchpoint",
+      "folder": "touchpoints",
+      "description": "Single interaction"
+    },
+    {
+      "type": "ForecastEntry",
+      "folder": "forecast-entries",
+      "description": "Period forecast line"
+    },
+    {
+      "type": "PipelineSnapshot",
+      "folder": "pipeline-snapshots",
+      "description": "Point-in-time pipeline view"
+    },
+    {
+      "type": "ReferralSource",
+      "folder": "referral-sources",
+      "description": "How the lead arrived"
+    }
+  ]
+}

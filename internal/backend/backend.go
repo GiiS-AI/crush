@@ -19,7 +19,6 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/db"
 	"github.com/GiiS-AI/GiiS-Code/internal/proto"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
-	_ "github.com/GiiS-AI/GiiS-Code/internal/skills/giis"
 	"github.com/GiiS-AI/GiiS-Code/internal/ui/util"
 	"github.com/GiiS-AI/GiiS-Code/internal/version"
 	"github.com/google/uuid"

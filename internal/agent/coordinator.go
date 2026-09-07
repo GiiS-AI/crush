@@ -37,7 +37,6 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/question"
 	"github.com/GiiS-AI/GiiS-Code/internal/session"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
-	giisskill "github.com/GiiS-AI/GiiS-Code/internal/skills/giis"
 	"golang.org/x/sync/errgroup"
 
 	"charm.land/fantasy/providers/anthropic"
@@ -649,11 +648,7 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 		tools.NewWriteTool(c.lspManager, c.permissions, c.history, c.filetracker, c.cfg.WorkingDir()),
 	)
 
-	if giisTools := giisskill.Tools(); len(giisTools) > 0 {
-		allTools = append(allTools, giisTools...)
-	}
-
-	// Add LSP tools if user has configured LSPs or auto_lsp is enabled (nil or true).
+// Add LSP tools if user has configured LSPs or auto_lsp is enabled (nil or true).
 	if len(c.cfg.Config().LSP) > 0 || c.cfg.Config().Options.AutoLSP == nil || *c.cfg.Config().Options.AutoLSP {
 		allTools = append(
 			allTools,

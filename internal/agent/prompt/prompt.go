@@ -17,7 +17,6 @@ import (
 	"github.com/GiiS-AI/GiiS-Code/internal/home"
 	"github.com/GiiS-AI/GiiS-Code/internal/shell"
 	"github.com/GiiS-AI/GiiS-Code/internal/skills"
-	_ "github.com/GiiS-AI/GiiS-Code/internal/skills/giis"
 )
 
 // Prompt represents a template-based prompt generator.
