@@ -2520,7 +2520,6 @@ func (m *UI) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 		main.Draw(scr, layout.main)
 
 	case uiLanding:
-		m.drawHeader(scr, layout.header)
 		main := uv.NewStyledString(m.landingView())
 		main.Draw(scr, layout.main)
 
@@ -3133,18 +3132,12 @@ func (m *UI) generateLayout(w, h int) uiLayout {
 	case uiLanding:
 		// Layout
 		//
-		// header
-		// ------
 		// main
 		// ------
 		// editor
 		// ------
 		// help
-		var headerRect, mainRect image.Rectangle
-		layout.Vertical(
-			layout.Len(landingHeaderHeight),
-			layout.Fill(1),
-		).Split(appRect).Assign(&headerRect, &mainRect)
+		mainRect := appRect
 		var editorRect image.Rectangle
 		layout.Vertical(
 			layout.Len(mainRect.Dy()-editorHeight),
@@ -3153,7 +3146,6 @@ func (m *UI) generateLayout(w, h int) uiLayout {
 		// Remove extra padding from editor (but keep it for header and main)
 		editorRect.Min.X -= 1
 		editorRect.Max.X += 1
-		uiLayout.header = headerRect
 		uiLayout.main = mainRect
 		uiLayout.editor = editorRect
 
