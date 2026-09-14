@@ -76,6 +76,14 @@ type KeyMap struct {
 		Switch key.Binding
 	}
 
+	DesktopLaunch struct {
+		Yes,
+		No,
+		Enter,
+		Switch,
+		ToggleRemember key.Binding
+	}
+
 	// Global key maps
 	Quit        key.Binding
 	Help        key.Binding
@@ -325,6 +333,27 @@ func DefaultKeyMap() KeyMap {
 	km.Initialize.Enter = key.NewBinding(
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "select"),
+	)
+
+	km.DesktopLaunch.Yes = key.NewBinding(
+		key.WithKeys("y", "Y"),
+		key.WithHelp("y", "yes"),
+	)
+	km.DesktopLaunch.No = key.NewBinding(
+		key.WithKeys("n", "N", "esc", "alt+esc"),
+		key.WithHelp("n", "no"),
+	)
+	km.DesktopLaunch.Switch = key.NewBinding(
+		key.WithKeys("left", "right", "tab"),
+		key.WithHelp("tab", "switch"),
+	)
+	km.DesktopLaunch.Enter = key.NewBinding(
+		key.WithKeys("enter", "ctrl+d"),
+		key.WithHelp("enter/ctrl+d", "select"),
+	)
+	km.DesktopLaunch.ToggleRemember = key.NewBinding(
+		key.WithKeys("ctrl+r"),
+		key.WithHelp("ctrl+r", "remember choice"),
 	)
 
 	return km

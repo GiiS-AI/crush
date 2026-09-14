@@ -108,6 +108,7 @@ type uiState uint8
 const (
 	uiOnboarding uiState = iota
 	uiInitialize
+	uiDesktopLaunchPrompt
 	uiLanding
 	uiChat
 )
@@ -259,6 +260,13 @@ type UI struct {
 	// onboarding state
 	onboarding struct {
 		yesInitializeSelected bool
+	}
+
+	// desktop launch prompt state
+	desktopLaunch struct {
+		yesSelected    bool
+		rememberChoice bool
+		launchError    string
 	}
 
 	// lsp
@@ -415,6 +423,7 @@ func New(com *common.Common, initialSessionID string, continueLast bool) *UI {
 
 	// set onboarding state defaults
 	ui.onboarding.yesInitializeSelected = true
+	ui.desktopLaunch.yesSelected = true
 
 	desiredState := uiLanding
 	desiredFocus := uiFocusEditor
@@ -422,6 +431,10 @@ func New(com *common.Common, initialSessionID string, continueLast bool) *UI {
 		desiredState = uiOnboarding
 	} else if n, _ := com.Workspace.ProjectNeedsInitialization(); n {
 		desiredState = uiInitialize
+	} else if com.Config().Options.DesktopAutoLaunch == nil {
+		desiredState = uiDesktopLaunchPrompt
+	} else if *com.Config().Options.DesktopAutoLaunch {
+		ui.launchDesktopApp()
 	}
 
 	// set initial state
@@ -2089,6 +2102,9 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 	case uiInitialize:
 		cmds = append(cmds, m.updateInitializeView(msg)...)
 		return tea.Batch(cmds...)
+	case uiDesktopLaunchPrompt:
+		cmds = append(cmds, m.updateDesktopLaunchPromptView(msg)...)
+		return tea.Batch(cmds...)
 	case uiChat, uiLanding:
 		switch m.focus {
 		case uiFocusEditor:
@@ -2519,6 +2535,12 @@ func (m *UI) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 		main := uv.NewStyledString(m.initializeView())
 		main.Draw(scr, layout.main)
 
+	case uiDesktopLaunchPrompt:
+		m.drawHeader(scr, layout.header)
+
+		main := uv.NewStyledString(m.desktopLaunchPromptView())
+		main.Draw(scr, layout.main)
+
 	case uiLanding:
 		main := uv.NewStyledString(m.landingView())
 		main.Draw(scr, layout.main)
@@ -2661,6 +2683,8 @@ func (m *UI) ShortHelp() []key.Binding {
 	switch m.state {
 	case uiInitialize:
 		binds = append(binds, k.Quit)
+	case uiDesktopLaunchPrompt:
+		binds = append(binds, k.DesktopLaunch.Enter, k.Quit)
 	case uiChat:
 		// Show cancel binding if agent is busy.
 		if m.isAgentBusy() {
@@ -2749,6 +2773,17 @@ func (m *UI) FullHelp() [][]key.Binding {
 	switch m.state {
 	case uiInitialize:
 		binds = append(binds,
+			[]key.Binding{
+				k.Quit,
+			})
+	case uiDesktopLaunchPrompt:
+		binds = append(binds,
+			[]key.Binding{
+				k.DesktopLaunch.Yes,
+				k.DesktopLaunch.No,
+				k.DesktopLaunch.Switch,
+				k.DesktopLaunch.ToggleRemember,
+			},
 			[]key.Binding{
 				k.Quit,
 			})
@@ -3099,7 +3134,7 @@ func (m *UI) generateLayout(w, h int) uiLayout {
 	appRect.Min.X += 1
 	appRect.Max.X -= 1
 
-	if slices.Contains([]uiState{uiOnboarding, uiInitialize, uiLanding}, m.state) {
+	if slices.Contains([]uiState{uiOnboarding, uiInitialize, uiDesktopLaunchPrompt, uiLanding}, m.state) {
 		// extra padding on left and right for these states
 		appRect.Min.X += 1
 		appRect.Max.X -= 1
@@ -3112,7 +3147,7 @@ func (m *UI) generateLayout(w, h int) uiLayout {
 
 	// Handle different app states
 	switch m.state {
-	case uiOnboarding, uiInitialize:
+	case uiOnboarding, uiInitialize, uiDesktopLaunchPrompt:
 		// Layout
 		//
 		// header

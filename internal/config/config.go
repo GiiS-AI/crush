@@ -289,6 +289,10 @@ type Options struct {
 	DisableNotifications      bool         `json:"disable_notifications,omitempty" jsonschema:"description=Deprecated: Use notification_style instead. Disable desktop notifications,default=false"`
 	NotificationStyle         string       `json:"notification_style,omitempty" jsonschema:"description=Notification style to use. Options: auto (default), native, osc, bell, disabled. Auto selects based on environment: native for local sessions, osc for SSH (with automatic OSC 99/777 detection).,enum=auto,enum=native,enum=osc,enum=bell,enum=disabled,default=auto"`
 	DisabledSkills            []string     `json:"disabled_skills,omitempty" jsonschema:"description=List of skill names to disable and hide from the agent,example=giis-code-config"`
+	// DesktopAutoLaunch remembers the user's choice on the desktop-launch
+	// prompt shown on first run. nil means "not answered yet, ask again";
+	// true/false is the remembered choice.
+	DesktopAutoLaunch *bool `json:"desktop_auto_launch,omitempty" jsonschema:"description=Whether to automatically launch the GiiS Desktop app on startup. Unset means the user has not been asked yet."`
 }
 
 type MCPs map[string]MCPConfig
