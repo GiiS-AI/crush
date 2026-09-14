@@ -266,7 +266,6 @@ type UI struct {
 	desktopLaunch struct {
 		yesSelected    bool
 		rememberChoice bool
-		launchError    string
 	}
 
 	// lsp

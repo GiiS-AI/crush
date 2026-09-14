@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -53,8 +54,7 @@ func (m *UI) confirmDesktopLaunchChoice() tea.Cmd {
 
 	if m.desktopLaunch.yesSelected {
 		if err := m.launchDesktopApp(); err != nil {
-			m.desktopLaunch.launchError = err.Error()
-			return tea.Batch(cmds...)
+			cmds = append(cmds, util.ReportError(fmt.Errorf("couldn't launch %s: %w", desktopAppBinary, err)))
 		}
 	}
 
@@ -108,9 +108,6 @@ func (m *UI) desktopLaunchPromptView() string {
 	hint := s.Content.Render("enter/ctrl+d to confirm, tab/←/→ to switch")
 
 	lines := []string{header, desc, remember, buttons, hint}
-	if m.desktopLaunch.launchError != "" {
-		lines = append(lines, s.Content.Render("Couldn't launch "+desktopAppBinary+": "+m.desktopLaunch.launchError))
-	}
 
 	width := min(m.layout.main.Dx(), 60)
 
